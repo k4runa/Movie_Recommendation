@@ -1,4 +1,4 @@
-from typing import Any
+from tmdb import fetch_tmdb_data,fetch_recommendations
 from sqlalchemy import (
     Column,
     ForeignKey,
@@ -18,7 +18,7 @@ import requests
 import psutil
 import platform
 from datetime import datetime, timezone
-import os
+from collections import Counter
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -55,9 +55,13 @@ class UserAlreadyExists(Exception):
     def __init__(self, username: str, *args: object) -> None:
         super().__init__(f"User {username} already exists - args=({args})")
 
+class UserNotFoundError(Exception):
+    def __init__(self,username:str ,*args: object) -> None:
+        super().__init__(f"User {username} not found - args=({args})")
+
 class MovieAlreadyExists(Exception):
-    def __init__(self,m ,*args: object) -> None:
-        super().__init__(f"Movide {m.title} - {m.content[:20]}... already exists - args=({args})")
+    def __init__(self,title:str,*args: object) -> None:
+        super().__init__(f"Movie {title} already exists - args=({args})")
 
 class UserScheme(BaseModel):
     username: str
@@ -112,7 +116,7 @@ class Watched(Base):
     tmdb_id         = Column(Integer, nullable=False)
     title           = Column(String, nullable=False)
     overview        = Column(String, nullable=True)
-    genre_ids       = Column(String, nullable=False)  # "28,878,12"
+    genre_ids       = Column(String, nullable=False)
     vote_average    = Column(String, nullable=True)
     watched_at      = Column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
     user            = relationship("User", back_populates="watched")
@@ -222,39 +226,43 @@ class MovieManager:
                     raise
 
         return wrapper
-    @staticmethod
-    def fetch_tmdb_data(query:str) -> dict[str,Any]:
-        api_key = os.getenv("API_KEY")
-        response:dict = requests.get(f"https://api.themoviedb.org/3/search/movie?query={query}&api_key={api_key}").json()
-        data = response.get("results",[])
-        if not data:
-            return {}
-        movie = data[0]
-        return {
-            "tmdb_id":      movie["id"],
-            "title":        movie["title"],
-            "overview":     movie["overview"],
-            "genre_ids":    ",".join(str(g) for g in movie["genre_ids"]),
-            "vote_average": movie["vote_average"]
-        }
 
-    #@transaction
-    #def add_movie(self,session,username:str ,m:MovieScheme) -> bool:
-    #    is_exist = session.query(Watched).filter_by(title=m.title,content=m.content).first()
-    #    user = session.query(User).filter_by(username=username).first()
-    #    if not user:
-    #        logger.error(f"User not found: {username}")
-    #        return False
-    #    if is_exist:
-    #        raise MovieAlreadyExists(m=m)
-    #    new_movie = Watched(user_id=user.id,title=m.title,content=m.content)
-    #    session.add(new_movie)
-    #    return True
+    def get_top_genres(self,username: str) -> list:
+        genre_ids = ""
+        with self.session() as session:
+            user = session.query(User).filter_by(username=username).first()
+            if user and user is not None:
+                for movie in user.watched:
+                    genre_ids += "," + movie.genre_ids
+        genre_ids = genre_ids.strip(",")
+        if not genre_ids or genre_ids is None:
+            logger.error(f"User {username} haven't watched any movie yet!")
+            return []
+        ids = [int(i) for i in genre_ids.split(",")]
+        count = Counter(ids)
+        top_genres = [item for item, _ in count.most_common(5)]    
+        return top_genres
 
-#users = UserManager("database.db", echo=True)
-#movies = MovieManager("database.db", echo=True)
-#new_user  = UserScheme(username="enes121233", password="1234", email="a@gmail.com")
-#new_movie = MovieScheme(title="test123",content="test filmi bla bla")
-#users.add_user(new_user)  # type: ignore
-#movies.add_movie(username="enes121233",m=new_movie) #type:ignore
+
+    @transaction
+    def add_movie(self,session,username:str ,query:str) -> bool:
+        user = session.query(User).filter_by(username=username).first()
+        data = fetch_tmdb_data(query)
+        is_exist = session.query(Watched).filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id")).first()
+        if is_exist:
+            raise MovieAlreadyExists(data.get("title"))     #type:ignore
+        if user and user is not None:
+            watched_at = datetime.now(timezone.utc).isoformat() 
+            movie = Watched(
+                user_id=user.id,
+                tmdb_id=data.get("tmdb_id"),
+                title=data.get("title"),
+                overview=data.get("overview"),
+                genre_ids=data.get("genre_ids"),
+                vote_average=data.get("vote_average"),
+                watched_at=watched_at
+            )
+            session.add(movie)
+            return True
+        raise UserNotFoundError(username)
 
