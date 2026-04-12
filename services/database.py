@@ -1,4 +1,4 @@
-from tmdb import fetch_tmdb_data,fetch_recommendations
+from services.tmdb import fetch_tmdb_data, fetch_recommendations
 from sqlalchemy import (
     Column,
     ForeignKey,
@@ -20,48 +20,56 @@ import platform
 from datetime import datetime, timezone
 from collections import Counter
 from dotenv import load_dotenv
+
 load_dotenv()
 
 format = "%(asctime)s - %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=format)
 logger = logging.getLogger(__name__)
 
+
 def collect_device_info() -> dict[str, str]:
     return {
-        "device":       platform.platform(),
-        "device_name":  platform.node(),
-        "machine":      platform.machine(),
-        "os":           platform.system(),
-        "hostname":     socket.gethostname(),
-        "memory":       f"{round(psutil.virtual_memory().total / (1024**3),2)} GB",
+        "device": platform.platform(),
+        "device_name": platform.node(),
+        "machine": platform.machine(),
+        "os": platform.system(),
+        "hostname": socket.gethostname(),
+        "memory": f"{round(psutil.virtual_memory().total / (1024**3), 2)} GB",
     }
+
 
 def fetch_network_info() -> dict[str, str]:
     try:
         data: dict = requests.get("https://ipinfo.io/json").json()
         return {
-            "country":      data.get("country", "unknown"),
-            "city":         data.get("city", "unknown"),
-            "ip":           data.get("ip", "unknown"),
+            "country": data.get("country", "unknown"),
+            "city": data.get("city", "unknown"),
+            "ip": data.get("ip", "unknown"),
         }
     except Exception as e:
         logger.warning(f"Could not fetch network info: {str(e)}")
         return {"country": "unknown", "city": "unknown", "ip": "unknown"}
 
+
 class Base(DeclarativeBase):
     pass
+
 
 class UserAlreadyExists(Exception):
     def __init__(self, username: str, *args: object) -> None:
         super().__init__(f"User {username} already exists - args=({args})")
 
+
 class UserNotFoundError(Exception):
-    def __init__(self,username:str ,*args: object) -> None:
+    def __init__(self, username: str, *args: object) -> None:
         super().__init__(f"User {username} not found - args=({args})")
 
+
 class MovieAlreadyExists(Exception):
-    def __init__(self,title:str,*args: object) -> None:
+    def __init__(self, title: str, *args: object) -> None:
         super().__init__(f"Movie {title} already exists - args=({args})")
+
 
 class UserScheme(BaseModel):
     username: str
@@ -80,46 +88,55 @@ class UserScheme(BaseModel):
 
 
 class MovieScheme(BaseModel):
-    query:str
+    query: str
+
 
 class User(Base):
     """
     Well.. You might ask, 'Why are you collecting so much data?'
     the answer? idk either.
     """
+
     __tablename__ = "users"
 
-    id              = Column(Integer, primary_key=True)
-    username        = Column(String, unique=True, nullable=False)
-    password        = Column(String, nullable=False)
-    email           = Column(String, unique=True, nullable=False)
-    device          = Column(String, nullable=False)
-    device_name     = Column(String, nullable=False)
-    machine         = Column(String, nullable=False)
-    os              = Column(String, nullable=False)
-    memory          = Column(String, nullable=False)
-    hostname        = Column(String, nullable=False)
-    country         = Column(String, nullable=False)
-    city            = Column(String, nullable=False)
-    ip              = Column(String, nullable=False)
-    is_deleted      = Column(Boolean, nullable=False, default=False)
-    created_at      = Column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat)
-    last_seen       = Column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat)
-    watched         = relationship("Watched", back_populates="user")
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, nullable=False)
+    password = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False)
+    device = Column(String, nullable=False)
+    device_name = Column(String, nullable=False)
+    machine = Column(String, nullable=False)
+    os = Column(String, nullable=False)
+    memory = Column(String, nullable=False)
+    hostname = Column(String, nullable=False)
+    country = Column(String, nullable=False)
+    city = Column(String, nullable=False)
+    ip = Column(String, nullable=False)
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    created_at = Column(
+        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat
+    )
+    last_seen = Column(
+        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat
+    )
+    watched = relationship("Watched", back_populates="user")
 
 
 class Watched(Base):
     __tablename__ = "watched_movies"
 
-    id              = Column(Integer, primary_key=True)
-    user_id         = Column(Integer, ForeignKey("users.id"))
-    tmdb_id         = Column(Integer, nullable=False)
-    title           = Column(String, nullable=False)
-    overview        = Column(String, nullable=True)
-    genre_ids       = Column(String, nullable=False)
-    vote_average    = Column(String, nullable=True)
-    watched_at      = Column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
-    user            = relationship("User", back_populates="watched")
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    tmdb_id = Column(Integer, nullable=False)
+    title = Column(String, nullable=False)
+    overview = Column(String, nullable=True)
+    genre_ids = Column(String, nullable=False)
+    vote_average = Column(String, nullable=True)
+    watched_at = Column(
+        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    user = relationship("User", back_populates="watched")
+
 
 class UserManager:
     def __init__(self, db_path: str, echo: bool = False):
@@ -172,10 +189,10 @@ class UserManager:
 
     @transaction
     def add_user(self, session, user: UserScheme) -> bool:
-        hashed          = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
-        network_data    = fetch_network_info()
-        device_info     = collect_device_info()
-        created_at      = datetime.now(timezone.utc).isoformat()
+        hashed = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
+        network_data = fetch_network_info()
+        device_info = collect_device_info()
+        created_at = datetime.now(timezone.utc).isoformat()
 
         user = User(
             username=user.username,
@@ -193,14 +210,14 @@ class UserManager:
             is_deleted=False,
             created_at=created_at,
             last_seen=created_at,
-        )   #type: ignore
+        )  # type: ignore
 
         is_user_exists = session.query(User).filter_by(username=user.username).first()
         if is_user_exists:
             logger.error(f"User already exists: {user.username}")
             raise UserAlreadyExists(user.username)
         session.add(user)
-        logger.info(f"Added user: {user}")
+        logger.info(f"Added user: {user.username} - {user.email}")
         return True
 
 
@@ -208,7 +225,7 @@ class MovieManager:
     def __init__(self, db_path: str, echo: bool = False) -> None:
         self.engine = create_engine(f"sqlite:///{db_path}", echo=echo)
         self.session = sessionmaker(bind=self.engine)
-    
+
     @staticmethod
     def transaction(func):
         @wraps(func)
@@ -227,7 +244,7 @@ class MovieManager:
 
         return wrapper
 
-    def get_top_genres(self,username: str) -> list:
+    def get_top_genres(self, username: str) -> list:
         genre_ids = ""
         with self.session() as session:
             user = session.query(User).filter_by(username=username).first()
@@ -240,19 +257,22 @@ class MovieManager:
             return []
         ids = [int(i) for i in genre_ids.split(",")]
         count = Counter(ids)
-        top_genres = [item for item, _ in count.most_common(5)]    
+        top_genres = [item for item, _ in count.most_common(5)]
         return top_genres
 
-
     @transaction
-    def add_movie(self,session,username:str ,query:str) -> bool:
+    def add_movie(self, session, username: str, query: str) -> bool:
         user = session.query(User).filter_by(username=username).first()
         data = fetch_tmdb_data(query)
-        is_exist = session.query(Watched).filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id")).first()
+        is_exist = (
+            session.query(Watched)
+            .filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id"))
+            .first()
+        )
         if is_exist:
-            raise MovieAlreadyExists(data.get("title"))     #type:ignore
+            raise MovieAlreadyExists(data.get("title"))  # type:ignore
         if user and user is not None:
-            watched_at = datetime.now(timezone.utc).isoformat() 
+            watched_at = datetime.now(timezone.utc).isoformat()
             movie = Watched(
                 user_id=user.id,
                 tmdb_id=data.get("tmdb_id"),
@@ -260,9 +280,8 @@ class MovieManager:
                 overview=data.get("overview"),
                 genre_ids=data.get("genre_ids"),
                 vote_average=data.get("vote_average"),
-                watched_at=watched_at
+                watched_at=watched_at,
             )
             session.add(movie)
             return True
         raise UserNotFoundError(username)
-
