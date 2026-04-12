@@ -1,6 +1,0 @@
-*.db
-*__pycahce__
-*.pt 
-*.pth
-.env
-env
