@@ -1,3 +1,4 @@
+from typing import Any
 from sqlalchemy import (
     Column,
     ForeignKey,
@@ -5,7 +6,6 @@ from sqlalchemy import (
     Integer,
     create_engine,
     Boolean,
-    DateTime,
     select,
 )
 from sqlalchemy.orm import relationship, sessionmaker, DeclarativeBase
@@ -18,39 +18,38 @@ import requests
 import psutil
 import platform
 from datetime import datetime, timezone
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 format = "%(asctime)s - %(levelname)s - %(message)s"
 logging.basicConfig(level=logging.INFO, format=format)
 logger = logging.getLogger(__name__)
 
-
 def collect_device_info() -> dict[str, str]:
     return {
-        "device": platform.platform(),
-        "device_name": platform.node(),
-        "machine": platform.machine(),
-        "os": platform.system(),
-        "hostname": socket.gethostname(),
-        "memory": f"{round(psutil.virtual_memory().total / (1024**3),2)} GB",
+        "device":       platform.platform(),
+        "device_name":  platform.node(),
+        "machine":      platform.machine(),
+        "os":           platform.system(),
+        "hostname":     socket.gethostname(),
+        "memory":       f"{round(psutil.virtual_memory().total / (1024**3),2)} GB",
     }
-
 
 def fetch_network_info() -> dict[str, str]:
     try:
         data: dict = requests.get("https://ipinfo.io/json").json()
         return {
-            "country": data.get("country", "unknown"),
-            "city": data.get("city", "unknown"),
-            "ip": data.get("ip", "unknown"),
+            "country":      data.get("country", "unknown"),
+            "city":         data.get("city", "unknown"),
+            "ip":           data.get("ip", "unknown"),
         }
     except Exception as e:
         logger.warning(f"Could not fetch network info: {str(e)}")
         return {"country": "unknown", "city": "unknown", "ip": "unknown"}
 
-
 class Base(DeclarativeBase):
     pass
-
 
 class UserAlreadyExists(Exception):
     def __init__(self, username: str, *args: object) -> None:
@@ -59,6 +58,7 @@ class UserAlreadyExists(Exception):
 class MovieAlreadyExists(Exception):
     def __init__(self,m ,*args: object) -> None:
         super().__init__(f"Movide {m.title} - {m.content[:20]}... already exists - args=({args})")
+
 class UserScheme(BaseModel):
     username: str
     password: str
@@ -76,44 +76,46 @@ class UserScheme(BaseModel):
 
 
 class MovieScheme(BaseModel):
-    title: str
-    content: str
+    query:str
 
 class User(Base):
+    """
+    Well.. You might ask, 'Why are you collecting so much data?'
+    the answer? idk either.
+    """
     __tablename__ = "users"
 
-    id          = Column(Integer, primary_key=True)
-    username    = Column(String, unique=True, nullable=False)
-    password    = Column(String, nullable=False)
-    email       = Column(String, unique=True, nullable=False)
-    device      = Column(String, nullable=False)
-    device_name = Column(String, nullable=False)
-    machine     = Column(String, nullable=False)
-    os          = Column(String, nullable=False)
-    memory      = Column(String, nullable=False)
-    hostname    = Column(String, nullable=False)
-    country     = Column(String, nullable=False)
-    city        = Column(String, nullable=False)
-    ip          = Column(String, nullable=False)
-    is_deleted  = Column(Boolean, nullable=False, default=False)
-    created_at  = Column(
-        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat
-    )
-    last_seen   = Column(
-        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat
-    )
-    watched = relationship("Watched", back_populates="user")
+    id              = Column(Integer, primary_key=True)
+    username        = Column(String, unique=True, nullable=False)
+    password        = Column(String, nullable=False)
+    email           = Column(String, unique=True, nullable=False)
+    device          = Column(String, nullable=False)
+    device_name     = Column(String, nullable=False)
+    machine         = Column(String, nullable=False)
+    os              = Column(String, nullable=False)
+    memory          = Column(String, nullable=False)
+    hostname        = Column(String, nullable=False)
+    country         = Column(String, nullable=False)
+    city            = Column(String, nullable=False)
+    ip              = Column(String, nullable=False)
+    is_deleted      = Column(Boolean, nullable=False, default=False)
+    created_at      = Column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat)
+    last_seen       = Column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat)
+    watched         = relationship("Watched", back_populates="user")
 
 
 class Watched(Base):
     __tablename__ = "watched_movies"
 
-    id          = Column(Integer, primary_key=True)
-    user_id     = Column(Integer, ForeignKey("users.id"))
-    title       = Column(String, nullable=True)
-    content     = Column(String, nullable=True)
-    user        = relationship("User", back_populates="watched")
-
+    id              = Column(Integer, primary_key=True)
+    user_id         = Column(Integer, ForeignKey("users.id"))
+    tmdb_id         = Column(Integer, nullable=False)
+    title           = Column(String, nullable=False)
+    overview        = Column(String, nullable=True)
+    genre_ids       = Column(String, nullable=False)  # "28,878,12"
+    vote_average    = Column(String, nullable=True)
+    watched_at      = Column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
+    user            = relationship("User", back_populates="watched")
 
 class UserManager:
     def __init__(self, db_path: str, echo: bool = False):
@@ -220,24 +222,39 @@ class MovieManager:
                     raise
 
         return wrapper
+    @staticmethod
+    def fetch_tmdb_data(query:str) -> dict[str,Any]:
+        api_key = os.getenv("API_KEY")
+        response:dict = requests.get(f"https://api.themoviedb.org/3/search/movie?query={query}&api_key={api_key}").json()
+        data = response.get("results",[])
+        if not data:
+            return {}
+        movie = data[0]
+        return {
+            "tmdb_id":      movie["id"],
+            "title":        movie["title"],
+            "overview":     movie["overview"],
+            "genre_ids":    ",".join(str(g) for g in movie["genre_ids"]),
+            "vote_average": movie["vote_average"]
+        }
 
-    @transaction
-    def add_movie(self,session,username:str ,m:MovieScheme) -> bool:
-        is_exist = session.query(Watched).filter_by(title=m.title,content=m.content).first()
-        user = session.query(User).filter_by(username=username).first()
-        if not user:
-            logger.error(f"User not found: {username}")
-            return False
-        if is_exist:
-            raise MovieAlreadyExists(m=m)
-        new_movie = Watched(user_id=user.id,title=m.title,content=m.content)
-        session.add(new_movie)
-        return True
+    #@transaction
+    #def add_movie(self,session,username:str ,m:MovieScheme) -> bool:
+    #    is_exist = session.query(Watched).filter_by(title=m.title,content=m.content).first()
+    #    user = session.query(User).filter_by(username=username).first()
+    #    if not user:
+    #        logger.error(f"User not found: {username}")
+    #        return False
+    #    if is_exist:
+    #        raise MovieAlreadyExists(m=m)
+    #    new_movie = Watched(user_id=user.id,title=m.title,content=m.content)
+    #    session.add(new_movie)
+    #    return True
 
-users = UserManager("database.db", echo=True)
-movies = MovieManager("database.db", echo=True)
-new_user  = UserScheme(username="enes121233", password="1234", email="a@gmail.com")
-new_movie = MovieScheme(title="test123",content="test filmi bla bla")
+#users = UserManager("database.db", echo=True)
+#movies = MovieManager("database.db", echo=True)
+#new_user  = UserScheme(username="enes121233", password="1234", email="a@gmail.com")
+#new_movie = MovieScheme(title="test123",content="test filmi bla bla")
 #users.add_user(new_user)  # type: ignore
 #movies.add_movie(username="enes121233",m=new_movie) #type:ignore
 
