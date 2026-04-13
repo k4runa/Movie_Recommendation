@@ -297,7 +297,7 @@ class MovieManager:
         top_genres = [item for item, _ in count.most_common(5)]
         return top_genres
 
-    def get_Movies_movies(self, username: str) -> list[Movies]:
+    def get_watched_movies(self, username: str) -> list[Movies]:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             raise UserNotFoundError(username)
