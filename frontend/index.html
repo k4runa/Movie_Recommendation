@@ -3,19 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CineWave - AI Movie Recommendations</title>
-    <!-- Google Fonts -->
+    <meta name="description" content="CineWave — AI-powered movie recommendations based on your watching habits. Track movies, get personalized suggestions, and manage your collection.">
+    <title>CineWave — AI Movie Recommendations</title>
+    <!-- Google Fonts — Outfit for a clean, modern feel -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/ui/css/style.css">
 </head>
 <body>
-    <!-- Abstract Background Orbs -->
+    <!-- Background orbs (disabled via CSS, kept for potential future use) -->
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
     
     <div class="glass-container">
         
-        <!-- Navbar -->
+        <!-- ============================================================ -->
+        <!-- NAVBAR                                                        -->
+        <!-- ============================================================ -->
         <nav class="navbar">
             <div class="logo">
                 <span class="gradient-text">CineWave</span> API
@@ -26,7 +29,10 @@
             </div>
         </nav>
 
-        <!-- Authentication View -->
+        <!-- ============================================================ -->
+        <!-- AUTHENTICATION VIEW                                           -->
+        <!-- Toggles between Login and Register via JavaScript.            -->
+        <!-- ============================================================ -->
         <main id="view-auth" class="view section-active">
             <div class="auth-box">
                 <div class="auth-header">
@@ -40,6 +46,7 @@
                         <input type="text" id="username" name="username" required autocomplete="off" placeholder="jack123">
                     </div>
                     
+                    <!-- Email field — only visible in Register mode -->
                     <div id="email-group" class="input-group hidden">
                         <label for="email">Email</label>
                         <input type="email" id="email" name="email" placeholder="jack@example.com">
@@ -60,17 +67,22 @@
             </div>
         </main>
 
-        <!-- Dashboard View -->
+        <!-- ============================================================ -->
+        <!-- DASHBOARD VIEW                                                -->
+        <!-- Contains four tab sections: My Movies, Recommendations,       -->
+        <!-- Add Movie, and Admin Panel (admin-only).                      -->
+        <!-- ============================================================ -->
         <main id="view-dashboard" class="view hidden">
             
+            <!-- Tab Navigation -->
             <div class="tabs">
                 <button class="tab-btn active" data-target="tab-watched">My Movies</button>
                 <button class="tab-btn" data-target="tab-recommend">Recommendations</button>
                 <button class="tab-btn" data-target="tab-add">Add Movie</button>
-                <button class="tab-btn hidden" data-target="tab-admin" id="btn-admin-tab" style="color: var(--primary);">👑 Admin Panel</button>
+                <button class="tab-btn hidden" data-target="tab-admin" id="btn-admin-tab">Admin Panel</button>
             </div>
 
-            <!-- Watched Movies Tab -->
+            <!-- Tab: My Movies ---------------------------------------- -->
             <section id="tab-watched" class="tab-content active">
                 <div class="section-header">
                     <h3>Watched Collection</h3>
@@ -78,11 +90,11 @@
                 </div>
                 <div id="loading-watched" class="loading hidden">Fetching your collection...</div>
                 <div id="watched-grid" class="movies-grid">
-                    <!-- Cards injected via JS -->
+                    <!-- Movie cards are injected here by app.js -->
                 </div>
             </section>
 
-            <!-- Recommendations Tab -->
+            <!-- Tab: Recommendations ---------------------------------- -->
             <section id="tab-recommend" class="tab-content hidden">
                  <div class="section-header">
                     <h3>For You</h3>
@@ -90,11 +102,11 @@
                 </div>
                 <div id="loading-recs" class="loading hidden">Analyzing your taste with AI...</div>
                 <div id="recs-grid" class="movies-grid">
-                    <!-- Cards injected via JS -->
+                    <!-- Recommendation cards are injected here by app.js -->
                 </div>
             </section>
 
-             <!-- Add Movie Tab -->
+            <!-- Tab: Add Movie ---------------------------------------- -->
             <section id="tab-add" class="tab-content hidden">
                  <div class="section-header">
                     <h3>Track a new movie</h3>
@@ -107,10 +119,10 @@
                 <div id="add-msg" class="msgbox hidden"></div>
             </section>
 
-             <!-- Admin Tab -->
+            <!-- Tab: Admin Panel (visible only to admin role) --------- -->
             <section id="tab-admin" class="tab-content hidden">
                  <div class="section-header">
-                    <h3 class="gradient-text" style="background: linear-gradient(90deg, #f59e0b, #ef4444); -webkit-background-clip: text;">Admin Control Center</h3>
+                    <h3>Admin Control Center</h3>
                     <p>System users metadata and management.</p>
                 </div>
                 <div id="loading-admin" class="loading hidden">Fetching system users...</div>
@@ -126,6 +138,7 @@
                             </tr>
                         </thead>
                         <tbody id="admin-users-tbody">
+                            <!-- User rows are injected here by app.js -->
                         </tbody>
                     </table>
                 </div>
@@ -134,6 +147,7 @@
         </main>
     </div>
 
+    <!-- Application logic — loaded after the DOM is ready -->
     <script src="/ui/js/app.js"></script>
 </body>
 </html>

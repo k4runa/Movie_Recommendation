@@ -1,7 +1,35 @@
+"""
+services/schemas.py — Pydantic Models (Request / Response)
+
+Defines all request validation schemas and response models used by
+the API.  FastAPI uses these for:
+
+    • Automatic request body parsing and validation.
+    • Response serialization — fields NOT listed in the response model
+      are stripped from the output, preventing sensitive data leaks
+      (e.g. password hashes, IP addresses for non-admin routes).
+    • Auto-generated OpenAPI / Swagger documentation.
+"""
+
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import List, Optional
 
+
+# ---------------------------------------------------------------------------
+# Request Schemas
+# ---------------------------------------------------------------------------
+
+
 class UserScheme(BaseModel):
+    """
+    Schema for user registration requests.
+
+    Validates:
+        - Username must be >= 5 characters with no special characters.
+        - Email must be a valid address (enforced by Pydantic's EmailStr).
+        - Password is accepted as-is (hashed server-side before storage).
+    """
+
     username: str
     password: str
     email: EmailStr
@@ -13,13 +41,33 @@ class UserScheme(BaseModel):
             raise ValueError("Username must be longer than 5 characters.")
         forbidden = set("@-.!'?*)(/{}%+^&")
         if forbidden & set(v):
-            raise ValueError("Username shouldn't have ant special characters.")
+            raise ValueError("Username shouldn't have any special characters.")
         return v
 
+
 class MovieScheme(BaseModel):
+    """
+    Schema for movie search / tracking requests.
+
+    The `query` string is forwarded to the TMDB search API to resolve
+    a movie by title.
+    """
+
     query: str
 
+
+# ---------------------------------------------------------------------------
+# Response Models
+#
+# These models act as whitelists — only the fields declared here are
+# included in the JSON response.  This is how we prevent password hashes,
+# raw IP addresses, and other sensitive columns from leaking to clients.
+# ---------------------------------------------------------------------------
+
+
 class UserResponse(BaseModel):
+    """Public-safe representation of a user record."""
+
     id: int
     username: str
     email: str
@@ -29,10 +77,11 @@ class UserResponse(BaseModel):
     city: str
     created_at: str
     last_seen: str
-    
-    # Optional filtering out IP, memory, hostname for security
-    
+
+
 class MovieResponse(BaseModel):
+    """Representation of a tracked movie."""
+
     id: int
     tmdb_id: int
     title: str
@@ -41,21 +90,41 @@ class MovieResponse(BaseModel):
     status: str
     vote_average: Optional[str] = None
 
+
 class WatchedMovieResponse(BaseModel):
+    """Representation of a movie marked as 'Watched'."""
+
     id: int
     title: str
     status: str
     watched_at: str
 
-# API wrapping responses
+
+# ---------------------------------------------------------------------------
+# Envelope Response Models
+#
+# API endpoints return responses wrapped in a standard envelope:
+#   { "success": true, "data": { ... } }
+# These models enforce that contract at the schema level.
+# ---------------------------------------------------------------------------
+
+
 class APIResponseUser(BaseModel):
+    """Envelope for a single user record."""
+
     success: bool
     data: dict[str, UserResponse]
 
+
 class APIResponseUsersList(BaseModel):
+    """Envelope for a paginated list of users."""
+
     success: bool
     data: dict[str, List[UserResponse]]
 
+
 class APIResponseWatchedMoviesList(BaseModel):
+    """Envelope for a paginated list of tracked movies."""
+
     success: bool
     data: dict[str, List[MovieResponse]]

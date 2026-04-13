@@ -1,14 +1,28 @@
+# ==========================================================================
+# CineWave API — Docker Compose
+# ==========================================================================
+# Single-service stack for local development and lightweight deployment.
+#
+# Usage:
+#   docker-compose up -d --build    # Build and start in background
+#   docker-compose logs -f api      # Stream logs
+#   docker-compose down             # Stop and remove containers
+#
+# The .env file is loaded automatically for secrets (JWT key, TMDB API key).
+# The SQLite database is persisted via the bind-mounted volume.
+# ==========================================================================
+
 version: '3.8'
 
 services:
   api:
     build: .
-    container_name: movie_recommendation_api
+    container_name: cinewave_api
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - .:/app                          # Live-reload during development
     environment:
-      - DB_PATH=database/database.db
+      - DB_PATH=database/database.db    # Override the default DB location
     env_file:
-      - .env
+      - .env                            # Secrets: JWT_SECRET_KEY, API_KEY, etc.

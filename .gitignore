@@ -1,25 +1,34 @@
-# Byte-compiled / optimized / DLL files
+# ==========================================================================
+# .gitignore — CineWave API
+# ==========================================================================
+
+# --- Python bytecode & caches ---
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Pytest
+# --- Testing ---
 .pytest_cache/
+.ruff_cache/
 
-# Virtual environments
+# --- Virtual environments ---
 venv/
 .venv/
 env/
+
+# --- Secrets (NEVER commit these) ---
 .env
 
-# Databases
+# --- Database files (regenerated at runtime) ---
 *.db
 *.sqlite3
 database/
 
-# IDE / OS specific 
+# --- IDE / OS specific ---
 .vscode/
 .idea/
 .DS_Store
+
+# --- ML model weights (if any) ---
 *.pt
 *.pth

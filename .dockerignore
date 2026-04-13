@@ -1,11 +1,14 @@
+# ==========================================================================
+# .dockerignore
+# ==========================================================================
+# Files and directories excluded from the Docker build context.
+# Keeps the image lean and prevents secrets from being baked in.
+# ==========================================================================
+
+.git
+.env
 __pycache__
 *.pyc
-*.pyo
-venv
-.env
-.venv
-.git
-.gitignore
-tests/
-database.db
+.pytest_cache
+.ruff_cache
 database/

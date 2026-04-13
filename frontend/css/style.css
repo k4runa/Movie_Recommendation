@@ -1,14 +1,44 @@
+/*
+ * CineWave — Design System & Component Styles
+ * ==============================================
+ * True dark theme using the Zinc color palette from Tailwind's
+ * design tokens.  No gradients, no neon — just clean, solid,
+ * production-grade aesthetics.
+ *
+ * Structure:
+ *   1. Design Tokens (CSS Variables)
+ *   2. Reset & Base Typography
+ *   3. Layout (Container, Navbar)
+ *   4. Buttons
+ *   5. Auth View
+ *   6. Dashboard & Tabs
+ *   7. Movie Cards & Grid
+ *   8. Admin Table
+ *   9. Forms & Inputs
+ *  10. Utility Classes
+ */
+
+
+/* ======================================================================
+   1. DESIGN TOKENS
+   ====================================================================== */
+
 :root {
-    --bg-dark: #09090b;
-    --glass-bg: #111113;
-    --glass-border: #27272a;
-    --primary: #f4f4f5;
-    --secondary: #a1a1aa;
-    --text-light: #fafafa;
-    --text-muted: #71717a;
-    --danger: #ef4444;
-    --success: #10b981;
+    --bg-dark: #09090b;       /* Page background — near black          */
+    --glass-bg: #111113;      /* Container / card background            */
+    --glass-border: #27272a;  /* Border color — Zinc-800               */
+    --primary: #f4f4f5;       /* Primary text / accent — Zinc-100      */
+    --secondary: #a1a1aa;     /* Secondary text — Zinc-400             */
+    --text-light: #fafafa;    /* Standard body text — Zinc-50          */
+    --text-muted: #71717a;    /* De-emphasized text — Zinc-500         */
+    --danger: #ef4444;        /* Destructive actions — Red-500         */
+    --success: #10b981;       /* Success feedback — Emerald-500        */
 }
+
+
+/* ======================================================================
+   2. RESET & BASE TYPOGRAPHY
+   ====================================================================== */
 
 * {
     box-sizing: border-box;
@@ -28,12 +58,16 @@ body {
     position: relative;
 }
 
-/* Background Orbs Removed per request */
+/* Background orbs — disabled, kept for potential future theming */
 .orb {
     display: none !important;
 }
 
-/* Main Container */
+
+/* ======================================================================
+   3. LAYOUT
+   ====================================================================== */
+
 .glass-container {
     width: 90%;
     max-width: 1200px;
@@ -47,17 +81,12 @@ body {
     flex-direction: column;
 }
 
-/* Typography & Layouts */
 .gradient-text {
     color: var(--text-light);
     font-weight: 800;
 }
 
-.hidden { display: none !important; }
-.cursor-pointer { cursor: pointer; }
-.w-100 { width: 100%; }
-
-/* Navbar */
+/* --- Navbar --- */
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -79,7 +108,11 @@ body {
     gap: 1rem;
 }
 
-/* Buttons */
+
+/* ======================================================================
+   4. BUTTONS
+   ====================================================================== */
+
 .btn {
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
@@ -110,7 +143,11 @@ body {
     background: #27272a;
 }
 
-/* Auth View */
+
+/* ======================================================================
+   5. AUTH VIEW
+   ====================================================================== */
+
 .view {
     flex: 1;
     animation: fadeIn 0.5s ease;
@@ -175,7 +212,11 @@ input:focus {
     font-size: 0.9rem;
 }
 
-/* Dashboard & Tabs */
+
+/* ======================================================================
+   6. DASHBOARD & TABS
+   ====================================================================== */
+
 .tabs {
     display: flex;
     gap: 1rem;
@@ -200,6 +241,7 @@ input:focus {
     position: relative;
 }
 
+/* Active tab underline indicator */
 .tab-btn.active::after {
     content: '';
     position: absolute;
@@ -211,7 +253,11 @@ input:focus {
     border-radius: 3px 3px 0 0;
 }
 
-/* Grid & Cards */
+
+/* ======================================================================
+   7. MOVIE CARDS & GRID
+   ====================================================================== */
+
 .movies-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -250,6 +296,7 @@ input:focus {
     padding-bottom: 0.5rem;
 }
 
+/* Clamped description — prevents cards from growing too tall */
 .desc-line {
     font-size: 0.85rem; 
     color: #a1a1aa; 
@@ -259,6 +306,7 @@ input:focus {
     overflow: hidden; 
 }
 
+/* Remove / Delete button (used in cards) */
 .btn-delete {
     background: transparent;
     color: var(--text-muted);
@@ -269,7 +317,7 @@ input:focus {
     cursor: pointer;
     transition: all 0.2s ease;
     width: 100%;
-    margin-top: auto;
+    margin-top: auto; /* Push to bottom of card */
 }
 
 .btn-delete:hover {
@@ -277,18 +325,24 @@ input:focus {
     color: var(--text-light);
 }
 
+/* Track Now button in recommendation cards */
 .rec-btn {
     margin-top: auto;
     font-size: 0.9rem;
     padding: 0.5rem 1rem;
 }
 
+/* Visual feedback while a tracking request is in flight */
 .btn-processing {
     opacity: 0.7;
     pointer-events: none;
 }
 
-/* Admin Table */
+
+/* ======================================================================
+   8. ADMIN TABLE
+   ====================================================================== */
+
 .table-responsive {
     overflow-x: auto;
     margin-top: 1rem;
@@ -319,6 +373,7 @@ input:focus {
     background: rgba(255, 255, 255, 0.04);
 }
 
+/* OS / metadata badge */
 .badge {
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
@@ -328,18 +383,31 @@ input:focus {
     display: inline-block;
 }
 
-/* Form layouts */
+
+/* ======================================================================
+   9. FORMS & INPUTS
+   ====================================================================== */
+
 .flex-row {
     display: flex;
     gap: 1rem;
     margin-top: 2rem;
 }
+
 .input-large {
     flex: 1;
     font-size: 1.1rem;
 }
 
-/* Helpers */
+
+/* ======================================================================
+   10. UTILITY CLASSES
+   ====================================================================== */
+
+.hidden { display: none !important; }
+.cursor-pointer { cursor: pointer; }
+.w-100 { width: 100%; }
+
 .error-msg {
     color: var(--danger);
     margin-top: 1rem;
@@ -350,12 +418,14 @@ input:focus {
 .success-msg {
     color: var(--success);
 }
+
 .msgbox {
     margin-top: 1rem;
     padding: 1rem;
     border-radius: 8px;
     background: rgba(0,0,0,0.2);
 }
+
 .loading {
     text-align: center;
     color: var(--text-muted);
