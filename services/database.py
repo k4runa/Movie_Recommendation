@@ -134,10 +134,20 @@ class Movies(Base):
     genre_ids = Column(String, nullable=False)
     vote_average = Column(String, nullable=True)
     status = Column(String, nullable=False, default="Not yet")
-    Movies_at = Column(
+    watched_at = Column(
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
     user = relationship("User", back_populates="movies")
+    watched_movies = relationship("WatchedMovies", back_populates="movies")
+
+
+class WatchedMovies(Base):
+    __tablename__ = "watched_movies"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("movies.user_id"))
+    """
+    soon...
+    """
 
 
 class UserManager:
