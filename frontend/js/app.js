@@ -216,13 +216,13 @@ async function fetchWithAuth(url, options = {}) {
 
 // Data Fetching
 async function loadWatchedMovies() {
-    el.watchedGrid.innerHTML = '';
     el.loadingWatched.classList.remove('hidden');
     
     try {
         const res = await fetchWithAuth(`/movies/${currentUsername}/watched`);
         const result = await res.json();
         
+        el.watchedGrid.innerHTML = '';
         const movies = result.data.watched_movies || [];
         dataLoaded.watched = true;
         
@@ -253,13 +253,13 @@ async function loadWatchedMovies() {
 }
 
 async function loadRecommendations() {
-    el.recsGrid.innerHTML = '';
     el.loadingRecs.classList.remove('hidden');
     
     try {
         const res = await fetchWithAuth(`/movies/recommendations/${currentUsername}`);
         const result = await res.json();
         
+        el.recsGrid.innerHTML = '';
         const recs = result.data.recommendations || [];
         dataLoaded.recs = true;
         

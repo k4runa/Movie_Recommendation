@@ -34,8 +34,8 @@ def fetch_recommendations(genre_ids: list[int], limit: int = 5) -> list[dict[str
     """
     if limit < 0:
         raise ValueError("Limit can not be negative.")
-    if limit > 10:
-        raise ValueError("Limit should be less than 10 (at least for now...)")
+    if limit > 20:
+        raise ValueError("Limit should be less than 20")
     api_key = os.getenv("API_KEY")
     genre_ids = ",".join(str(i) for i in genre_ids)  # type: ignore
     response = requests.get(

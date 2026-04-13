@@ -41,6 +41,8 @@ def add_movie(username: str, movie: MovieScheme, current_user: dict = Depends(ge
     movies_manager.add_movie(username=username, query=movie.query)  # type: ignore
     return {"success": True, "message": "Movie successfully added."}
 
+import random
+
 @router.get("/recommendations/{username}")
 @print_log
 def get_recommendations(username: str, current_user: dict = Depends(get_current_user)):
@@ -50,7 +52,9 @@ def get_recommendations(username: str, current_user: dict = Depends(get_current_
     watched = movies_manager.get_watched_movies(username, skip=0, limit=1000)  # type: ignore
     watched_tmdb_ids = {m.get("tmdb_id") for m in watched}
     
-    recommendations = fetch_recommendations(movies_manager.get_top_genres(username))
+    recommendations = fetch_recommendations(movies_manager.get_top_genres(username), limit=20)
     filtered_recs = [r for r in recommendations if r.get("tmdb_id") not in watched_tmdb_ids]
     
-    return {"success": True, "data": {"recommendations": filtered_recs}}
+    random.shuffle(filtered_recs)
+    
+    return {"success": True, "data": {"recommendations": filtered_recs[:6]}}
