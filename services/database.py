@@ -112,6 +112,7 @@ class User(Base):
     country = Column(String, nullable=False)
     city = Column(String, nullable=False)
     ip = Column(String, nullable=False)
+
     is_deleted = Column(Boolean, nullable=False, default=False)
     created_at = Column(
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat
@@ -212,12 +213,46 @@ class UserManager:
             last_seen=created_at,
         )  # type: ignore
 
-        is_user_exists = session.query(User).filter_by(username=user.username).first()
+        is_user_exists = self.user_exists(session, user.username)
         if is_user_exists:
             logger.error(f"User already exists: {user.username}")
             raise UserAlreadyExists(user.username)
         session.add(user)
         logger.info(f"Added user: {user.username} - {user.email}")
+        return True
+
+    @transaction
+    def delete_user(self, session, username: str) -> bool:
+        user = session.query(User).filter_by(username=username).first()
+        if not user:
+            raise UserNotFoundError(username)
+        session.delete(user)
+        logger.info(f"Deleted user: {user.username}")
+        return True
+
+    def get_user_by_username(self, session, username: str) -> User:
+        user = session.query(User).filter_by(username=username).first()
+        if not user:
+            raise UserNotFoundError(username)
+        return user
+
+    def get_user_by_id(self, session, id: int) -> User:
+        user = session.query(User).filter_by(id=id).first()
+        if not user:
+            raise UserNotFoundError(id)
+        return user
+
+    def get_all_users(self, session) -> list[User]:
+        return session.query(User).all()
+
+    @transaction
+    def update_user_field(self, session, username: str, field: str, value: str) -> bool:
+        user = session.query(User).filter_by(username=username).first()
+        if not user:
+            raise UserNotFoundError(username)
+        setattr(user, field, value)
+        session.commit()
+        logger.info(f"Updated user: {user.username} - {field}: {value}")
         return True
 
 
@@ -259,6 +294,23 @@ class MovieManager:
         count = Counter(ids)
         top_genres = [item for item, _ in count.most_common(5)]
         return top_genres
+
+    @transaction
+    def delete_movie(self, session, username: str, query: str) -> bool:
+        user = session.query(User).filter_by(username=username).first()
+        data = fetch_tmdb_data(query)
+        is_exist = (
+            session.query(Watched)
+            .filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id"))
+            .first()
+        )
+        if not is_exist:
+            raise MovieNotFoundError(data.get("title"))  # type:ignore
+        if user and user is not None:
+            session.delete(is_exist)
+            logger.info(f"Deleted movie: {data.get('title')} - {user.username}")
+            return True
+        return False
 
     @transaction
     def add_movie(self, session, username: str, query: str) -> bool:
