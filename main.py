@@ -27,8 +27,8 @@ from routers import auth, users, movies
 # Application Factory
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="CineWave — Movie Recommendation API",
-    description="A RESTful API for tracking movies and generating AI-powered recommendations via TMDB.",
+    title="Movie Recommendation API",
+    description="A production-ready RESTful API for tracking personal movie collections and generating genre-based recommendations via TMDB.",
     version="1.0.0",
 )
 
