@@ -248,8 +248,8 @@ class UserManager:
         return {c.name: getattr(user, c.name) for c in user.__table__.columns}
 
     @transaction
-    def get_all_users(self, session) -> list[dict]:
-        users = session.query(User).all()
+    def get_all_users(self, session, skip: int = 0, limit: int = 10) -> list[dict]:
+        users = session.query(User).offset(skip).limit(limit).all()
         return [
             {c.name: getattr(u, c.name) for c in u.__table__.columns} for u in users
         ]
@@ -309,13 +309,14 @@ class MovieManager:
         return top_genres
 
     @transaction
-    def get_watched_movies(self, session, username: str) -> list[dict]:
+    def get_watched_movies(self, session, username: str, skip: int = 0, limit: int = 10) -> list[dict]:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             raise UserNotFoundError(username)
+        # Use simple slice-based pagination for relationships (though query filter is better, this works for existing list structure)
         return [
             {c.name: getattr(m, c.name) for c in m.__table__.columns}
-            for m in user.movies
+            for m in user.movies[skip:skip+limit]
         ]
 
     @transaction

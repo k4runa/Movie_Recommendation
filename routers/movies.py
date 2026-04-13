@@ -19,10 +19,10 @@ def print_log(func):
 
 @router.get("/{username}/watched", response_model=APIResponseWatchedMoviesList)
 @print_log
-def get_watched_movies(username: str, current_user: dict = Depends(get_current_user)):
+def get_watched_movies(username: str, skip: int = 0, limit: int = 10, current_user: dict = Depends(get_current_user)):
     if current_user.get("username") != username:
          raise HTTPException(status_code=403, detail="Not authorized to access this resource")
-    watched_movies = movies_manager.get_watched_movies(username)  # type: ignore
+    watched_movies = movies_manager.get_watched_movies(username, skip=skip, limit=limit)  # type: ignore
     return {"success": True, "data": {"watched_movies": watched_movies}}
 
 @router.delete("/{username}/{title}")
