@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 import os
 from dotenv import load_dotenv
 from functools import wraps
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -32,8 +33,14 @@ if not API_KEY:
     logger.warning("API_KEY not set")
 app = FastAPI()
 
+
 users = UserManager(db_path=DB_PATH, echo=False)  # type:ignore
 movies = MovieManager(db_path=DB_PATH, echo=False)  # type:ignore
+
+
+class UpdateUserRequest(BaseModel):
+    field: str
+    value: str
 
 
 @app.exception_handler(RequestValidationError)
@@ -106,3 +113,31 @@ def get_all_users():
     all_users = users.get_all_users()
     logger.info("Fetched all users")
     return {"success": True, "data": {"users": all_users}}
+
+
+@print_log
+@app.get("/users/{id}")
+def get_user_by_id(id: int):
+    user = users.get_user_by_id(id)
+    return {"success": True, "data": {"user": user}}
+
+
+@print_log
+@app.get("/users/by-username/{username}")
+def get_user_by_username(username: str):
+    user = users.get_user_by_username(username)
+    return {"success": True, "data": {"user": user}}
+
+
+@print_log
+@app.delete("/users/{username}")
+def delete_user(username: str):
+    success = users.delete_user(username)
+    return {"success": success}
+
+
+@print_log
+@app.patch("/users/{username}")
+def update_user_field(username: str, v: UpdateUserRequest):
+    success = users.update_user_field(username, v.field, v.value)
+    return {"success": success}
