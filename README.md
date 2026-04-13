@@ -1,198 +1,124 @@
-# CineWave — AI Movie Recommendation API
+# Movie Recommendation API
 
-A production-grade RESTful API for tracking movies and generating personalized recommendations powered by [TMDB](https://www.themoviedb.org/). Built with **FastAPI**, secured with **JWT authentication**, managed with **Alembic migrations**, and shipped with a custom dark-themed **web interface**.
+<div align="center">
 
----
+![GitHub last commit](https://img.shields.io/github/last-commit/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
+![GitHub top language](https://img.shields.io/github/languages/top/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
+![GitHub repo size](https://img.shields.io/github/repo-size/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
+![Python Version](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.135+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 
-## Features
-
-| Category | Details |
-|---|---|
-| **Authentication** | JWT Bearer tokens via `PyJWT` + `bcrypt` password hashing. OAuth2-compatible login endpoint. |
-| **User Management** | Registration, profile retrieval, soft-delete, field-level updates. Device fingerprint & geolocation metadata collected at signup for admin analytics. |
-| **Movie Tracking** | Search TMDB by title, add movies to your personal collection, remove them at will. |
-| **Smart Recommendations** | Genre-based discovery — analyses your top 5 most-watched genres, queries TMDB's `/discover` endpoint, filters out already-tracked movies, and shuffles results for variety on every page load. |
-| **Admin Panel** | Role-based access control (`admin` / `user`). Admin users can view all registered users' device metadata (OS, location, join date) and ban accounts via the web UI. |
-| **Pagination** | `skip` / `limit` query params on all list endpoints. |
-| **Database Migrations** | Alembic integration for zero-downtime, zero-data-loss schema evolution. |
-| **Web UI** | Vanilla JS single-page application with a true dark theme (Zinc palette), tab-based navigation, and lazy-loaded cached data to eliminate flicker. |
-| **Containerized** | Dockerfile + docker-compose for one-command deployment. |
-| **Tested** | End-to-end pytest suite covering the full auth lifecycle and ownership enforcement. |
+</div>
 
 ---
 
-## Project Structure
+A production-ready RESTful API for tracking personal movie collections and generating genre-based recommendations using data from [TMDB](https://www.themoviedb.org/). Features a modern, high-performance dark-themed SPA (Single Page Application) built with vanilla JavaScript.
 
+---
+
+## 🚀 Features
+
+| Category                     | Details                                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 🔐 **Authentication**        | Secure JWT Bearer tokens via `PyJWT` + `bcrypt`. OAuth2-compatible flow.                                                    |
+| 👥 **User Management**       | Full CRUD with soft-delete. Automatic role assignment (`admin` vs `user`).                                                  |
+| 🎬 **Collection Tracking**   | Real-time TMDB search. Add/Remove movies to your "Watched" or "To Watch" list.                                              |
+| 🧠 **Recommendation Engine** | Genre-based discovery algorithm. Analyzes your watch history categories and discovers similar trending titles via TMDB API. |
+| 🛡️ **Ownership & Privacy**   | Strict ownership enforcement. Users can only access and modify their own collections.                                       |
+| 🛠️ **Admin Oversight**       | Powerful admin dashboard to manage users, view device metadata, and enforce community standards.                            |
+| 📱 **Responsive UI**         | Flicker-free Single Page App (SPA) with a premium Zinc dark theme and smooth transitions.                                   |
+| 📦 **Infrastructure**        | Fully containerized with Docker. Zero-config deployment via Docker Compose.                                                 |
+| 🧪 **Test Suite**            | Comprehensive E2E tests using `pytest` and `TestClient`.                                                                    |
+
+---
+
+## 📁 Project Structure
+
+```text
+.
+├── main.py                     # App entry point & global configurations
+├── alembic/                    # Database schema migration framework
+├── routers/                    # API route definitions (Modularized)
+│   ├── auth.py                 # JWT issuance & Login
+│   ├── users.py                # User profiles & Admin operations
+│   └── movies.py               # Movie tracking & Recommendations
+├── services/                   # Business logic & Core engines
+│   ├── auth.py                 # Token logic & Password hashing
+│   ├── database.py             # SQLAlchemy models & CRUD managers
+│   ├── schemas.py              # Pydantic validation & Serialization
+│   ├── deps.py                 # Dependency injection containers
+│   └── tmdb.py                 # TMDB API integration layer
+├── frontend/                   # Modern Web SPA
+│   ├── index.html              # Reactive HTML shell
+│   ├── css/style.css           # Premium dark theme design system
+│   └── js/app.js               # Tab-based SPA logic & API client
+├── tests/                      # Automated test suite
+└── Dockerfile                  # Production container definition
 ```
-CineWave/
-├── main.py                     # FastAPI app bootstrap & global exception handlers
-├── alembic/                    # Database migration framework
-│   ├── env.py                  # Alembic environment config (loads ORM metadata)
-│   └── versions/               # Auto-generated migration scripts
-├── routers/
-│   ├── __init__.py             # Router package exports
-│   ├── auth.py                 # POST /login — JWT token issuance
-│   ├── users.py                # CRUD /users — registration, profile, admin list
-│   └── movies.py               # CRUD /movies + GET /recommendations
-├── services/
-│   ├── auth.py                 # JWT creation, validation & password verification
-│   ├── database.py             # ORM models (User, Movies, WatchedMovies) & managers
-│   ├── schemas.py              # Pydantic request/response models (data whitelist)
-│   ├── deps.py                 # Singleton manager instances (dependency injection)
-│   └── tmdb.py                 # TMDB API integration (search & discover)
-├── frontend/
-│   ├── index.html              # SPA shell — auth form, dashboard tabs, admin table
-│   ├── css/style.css           # Design system — true dark theme (Zinc palette)
-│   └── js/app.js               # Client-side logic — auth, data fetching, caching
-├── tests/
-│   └── test_auth.py            # E2E test: register → login → access → ownership
-├── Dockerfile                  # Container image definition
-├── docker-compose.yml          # Single-service orchestration
-├── alembic.ini                 # Alembic configuration (DB URL, logging)
-├── requirements.txt            # Pinned Python dependencies (production only)
-├── .env                        # Secrets (not committed — see template below)
-├── .gitignore                  # Git exclusions
-└── .dockerignore               # Docker build context exclusions
-```
 
 ---
 
-## Quick Start
+## 🛠️ Tech Stack
 
-### Option 1 — Docker (Recommended)
+- **Backend:** FastAPI (Python 3.10+)
+- **ORM / DB:** SQLAlchemy 2.0 with SQLite
+- **Migrations:** Alembic
+- **Frontend:** Vanilla JS, CSS3, Semantic HTML5
+- **Security:** JWT (JSON Web Tokens) & Bcrypt
+- **DevOps:** Docker, Docker Compose
+
+---
+
+## ⚡ Quick Start
+
+### 1. Requirements
+
+Ensure you have a **TMDB API Key** ([Get one here](https://www.themoviedb.org/settings/api)).
+
+### 2. Docker Setup (Recommended)
 
 ```bash
 git clone https://github.com/k4runa/Movie_Recommendation.git
 cd Movie_Recommendation
-```
 
-Create a `.env` file in the project root:
+# Create .env and paste your credentials
+cp .env.example .env  # If example exists, else create manually
 
-```env
-DB_PATH=database/database.db
-JWT_SECRET_KEY=your_super_secret_jwt_key
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=120
-API_KEY=your_tmdb_api_key_here
-```
-
-Build and run:
-
-```bash
+# Start the stack
 docker-compose up -d --build
 ```
 
-### Option 2 — Local Development
+### 3. Localization
 
-```bash
-python -m venv .venv
-source .venv/bin/activate          # Linux/macOS
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
+The API will be available at `http://localhost:8000`.
+
+- **Web UI:** [http://localhost:8000/ui](http://localhost:8000/ui)
+- **Interactive Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
-## Access Points
+## 🧪 Development & Testing
 
-| URL | Description |
-|---|---|
-| `http://localhost:8000/ui` | **Web Interface** — Full SPA with auth, tracking, recommendations, and admin panel |
-| `http://localhost:8000/docs` | **Swagger UI** — Interactive API documentation with "Try it out" |
-| `http://localhost:8000/redoc` | **ReDoc** — Alternative read-only API documentation |
-
----
-
-## API Endpoints
-
-### Authentication
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/login` | No | Authenticate and receive a JWT |
-
-### Users
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/users` | No | Register a new account |
-| `GET` | `/users` | Admin | List all users (admin-only) |
-| `GET` | `/users/{username}` | Owner | Get own profile |
-| `GET` | `/users/id/{id}` | No | Get user by numeric ID |
-| `DELETE` | `/users/{username}` | Owner | Soft-delete own account |
-| `PATCH` | `/users/{username}` | Owner | Update a profile field |
-
-### Movies
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/movies/{username}/watched` | Owner | List tracked movies (paginated) |
-| `POST` | `/movies/{username}` | Owner | Track a new movie (TMDB search) |
-| `DELETE` | `/movies/{username}/{title}` | Owner | Remove a tracked movie |
-| `GET` | `/movies/recommendations/{username}` | Owner | Get personalized recommendations |
-
----
-
-## Database Migrations
-
-Schema changes are managed with [Alembic](https://alembic.sqlalchemy.org/). You never need to delete your database when the schema evolves.
-
-```bash
-# After modifying ORM models in services/database.py:
-python -m alembic revision --autogenerate -m "describe your change"
-
-# Apply all pending migrations:
-python -m alembic upgrade head
-
-# Roll back one migration:
-python -m alembic downgrade -1
-```
-
----
-
-## Admin Access
-
-Register with the username **`admin`** to receive automatic admin privileges. The admin panel provides:
-
-- Full user metadata table (device, OS, city/country, join date)
-- User ban (soft-delete) with confirmation dialogs
-- Protected by role-based access on both the API and UI layers
-
----
-
-## Testing
+**Run Tests:**
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-The test suite covers:
-- User registration (POST /users)
-- Login and JWT issuance (POST /login)
-- Protected route access with a valid token
-- Ownership enforcement (accessing another user's data → 403)
+**Apply Migrations:**
+
+```bash
+alembic upgrade head
+```
 
 ---
 
-## Environment Variables
+## Admin Panel
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `DB_PATH` | Yes | `database/database.db` | Path to the SQLite database file |
-| `JWT_SECRET_KEY` | Yes | — | HMAC signing key for JWT tokens |
-| `JWT_ALGORITHM` | No | `HS256` | JWT signing algorithm |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `120` | Token TTL in minutes |
-| `API_KEY` | Yes | — | TMDB API key ([get one here](https://www.themoviedb.org/settings/api)) |
+Register with the username `admin` to gain automatic administrative privileges. You can then access the **Admin Panel** tab in the UI to manage the user base and view system analytics.
 
 ---
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | FastAPI 0.135 |
-| ORM | SQLAlchemy 2.x |
-| Database | SQLite |
-| Migrations | Alembic |
-| Auth | PyJWT + bcrypt |
-| External API | TMDB v3 |
-| Frontend | Vanilla JS / CSS (SPA) |
-| Testing | Pytest |
-| Deployment | Docker + docker-compose |
+<div align="center">
+  <sub>Built with ❤️ for Movie Lovers.</sub>
+</div>
