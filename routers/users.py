@@ -29,10 +29,9 @@ def register(user: UserScheme):
 
 @router.get("", response_model=APIResponseUsersList)
 @print_log
-def get_all_users():
-    logger.info("Fetching all users from database...")
-    all_users = users_manager.get_all_users()  # type: ignore
-    logger.info("Fetched all users")
+def get_all_users(skip: int = 0, limit: int = 10):
+    logger.info(f"Fetching users with skip={skip}, limit={limit}...")
+    all_users = users_manager.get_all_users(skip=skip, limit=limit)  # type: ignore
     return {"success": True, "data": {"users": all_users}}
 
 @router.get("/id/{id}", response_model=APIResponseUser)
