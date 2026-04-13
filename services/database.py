@@ -301,7 +301,7 @@ class MovieManager:
                     genre_ids += "," + movie.genre_ids
         genre_ids = genre_ids.strip(",")
         if not genre_ids or genre_ids is None:
-            logger.error(f"User {username} haven't watched any movie yet!")
+            logger.info(f"User {username} hasn't rated/watched enough categories yet.")
             return []
         ids = [int(i) for i in genre_ids.split(",")]
         count = Counter(ids)

@@ -32,26 +32,26 @@ body {
 .orb {
     position: absolute;
     border-radius: 50%;
-    filter: blur(100px);
+    filter: blur(120px);
     z-index: -1;
-    opacity: 0.5;
-    animation: float 10s infinite alternate;
+    opacity: 0.15;
+    animation: float 15s infinite alternate;
 }
 
 .orb-1 {
-    width: 400px;
-    height: 400px;
-    background: var(--primary);
-    top: -100px;
-    left: -100px;
+    width: 500px;
+    height: 500px;
+    background: #6a1b9a;
+    top: -150px;
+    left: -150px;
 }
 
 .orb-2 {
-    width: 300px;
-    height: 300px;
-    background: var(--secondary);
-    bottom: -50px;
-    right: -50px;
+    width: 400px;
+    height: 400px;
+    background: #1565c0;
+    bottom: -100px;
+    right: -100px;
     animation-delay: -5s;
 }
 
@@ -247,48 +247,76 @@ input:focus {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.5rem;
+    padding-top: 1.5rem;
 }
 
 .movie-card {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.015);
     border: 1px solid var(--glass-border);
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 1.5rem;
-    transition: transform 0.3s ease, background 0.3s ease;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+    display: flex;
+    flex-direction: column;
 }
 
 .movie-card:hover {
-    transform: translateY(-5px);
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .movie-card h4 {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     margin-bottom: 0.5rem;
+    font-weight: 600;
 }
 
 .movie-card .meta {
     display: flex;
     justify-content: space-between;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     margin-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0.5rem;
+}
+
+.desc-line {
+    font-size: 0.85rem; 
+    color: #a1a1aa; 
+    margin-bottom: 1.5rem; 
+    line-height: 1.4;
+    height: 3.8rem; 
+    overflow: hidden; 
 }
 
 .btn-delete {
     background: transparent;
-    color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--text-muted);
+    border: 1px solid var(--glass-border);
     padding: 0.4rem 0.8rem;
     border-radius: 6px;
     font-size: 0.8rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    width: 100%;
+    margin-top: auto;
 }
 
 .btn-delete:hover {
-    background: rgba(239, 68, 68, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+}
+
+.rec-btn {
+    margin-top: auto;
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+}
+
+.btn-processing {
+    opacity: 0.7;
+    pointer-events: none;
 }
 
 /* Form layouts */

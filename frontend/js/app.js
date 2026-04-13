@@ -210,17 +210,17 @@ async function loadWatchedMovies() {
             el.watchedGrid.innerHTML = `<p class="color-text-muted">You haven't tracked any movies yet.</p>`;
         } else {
             movies.forEach(m => {
-                const dateRaw = new Date(m.watched_at).toLocaleDateString();
+                const dateRaw = new Date(m.watched_at || new Date()).toLocaleDateString();
                 const card = document.createElement('div');
                 card.className = 'movie-card';
                 card.innerHTML = `
                     <h4>${m.title}</h4>
                     <div class="meta">
                         <span>TMDB #${m.tmdb_id || '?'}</span>
-                        <span>Tracked on ${dateRaw}</span>
+                        <span class="muted">Added ${dateRaw}</span>
                     </div>
-                    <p style="font-size:0.9rem; color:#a1a1aa; margin-bottom:1rem; height:40px; overflow:hidden;">${m.overview || 'No description available'}</p>
-                    <button class="btn-delete" onclick="deleteMovie('${m.title}')">✖ Remove</button>
+                    <p class="desc-line">${m.overview || 'No description available for this title.'}</p>
+                    <button class="btn-delete" onclick="deleteMovie('${m.title.replace(/'/g, "\\'")}')">Remove</button>
                 `;
                 el.watchedGrid.appendChild(card);
             });
@@ -247,15 +247,13 @@ async function loadRecommendations() {
             recs.forEach(m => {
                 const card = document.createElement('div');
                 card.className = 'movie-card';
-                card.style.background = 'rgba(138, 43, 226, 0.05)';
                 card.innerHTML = `
                     <h4>${m.title}</h4>
                     <div class="meta">
-                        <span>⭐ ${m.vote_average || 'N/A'}</span>
-                        <span>Release: ${m.release_date || 'Unknown'}</span>
+                        <span>Rating: ${m.vote_average || 'N/A'}</span>
                     </div>
-                    <p style="font-size:0.9rem; color:#a1a1aa; margin-bottom:1rem; height:60px; overflow:hidden; text-overflow:ellipsis;">${m.overview || 'No description'}</p>
-                    <button class="btn btn-outline" style="width:100%; border-color:var(--primary); color:var(--primary)" onclick="quickTrack('${m.title}')">+ Track Now</button>
+                    <p class="desc-line">${m.overview || 'No description available for this title.'}</p>
+                    <button class="btn btn-outline w-100 rec-btn" onclick="quickTrack(this, '${m.title.replace(/'/g, "\\'") }')">+ Track Now</button>
                 `;
                 el.recsGrid.appendChild(card);
             });
@@ -288,18 +286,23 @@ async function handleAddMovie(e) {
         el.addMsg.innerHTML = `<span class="success-msg">Movie tracked successfully!</span>`;
         el.movieQuery.value = '';
         
-        // Refresh watched list silently
-        loadWatchedMovies();
+        // Return to watched tab automatically
+        switchTab('tab-watched');
     } catch (err) {
         el.addMsg.innerHTML = `<span class="error-msg">${err.message}</span>`;
     }
 }
 
-window.quickTrack = function(title) {
+window.quickTrack = function(btnElement, title) {
     el.movieQuery.value = title;
-    switchTab('tab-add');
-    el.addMsg.innerHTML = "Submitting...";
-    el.addMovieForm.dispatchEvent(new Event('submit'));
+    btnElement.innerText = "Submitting...";
+    btnElement.classList.add('btn-processing');
+    
+    // Slight timeout so UI updates before native form submit freezes it
+    setTimeout(() => {
+        switchTab('tab-add');
+        el.addMovieForm.dispatchEvent(new Event('submit'));
+    }, 200);
 }
 
 window.deleteMovie = async function(title) {
