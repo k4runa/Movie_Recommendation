@@ -92,21 +92,6 @@ def register(user: UserScheme):
 
 
 @print_log
-@app.post("/movies/{username}")
-def add_movie(username: str, movie: MovieScheme):
-    movies.add_movie(username=username, query=movie.query)  # type: ignore
-    return {"success": True, "message": "Movie successfully added."}
-
-
-@print_log
-@app.get("/movies/recommendations/{username}")
-def get_recommendations(username: str):
-    top_genres = movies.get_top_genres(username)
-    recommendations = fetch_recommendations(top_genres)
-    return {"success": True, "data": {"recommendations": recommendations}}
-
-
-@print_log
 @app.get("/users/get_all_users")
 def get_all_users():
     logger.info("Fetching all users from database...")
@@ -141,3 +126,31 @@ def delete_user(username: str):
 def update_user_field(username: str, v: UpdateUserRequest):
     success = users.update_user_field(username, v.field, v.value)
     return {"success": success}
+
+
+@print_log
+@app.get("/users/{username}/watched")
+def get_watched_movies(username: str):
+    watched_movies = users.get_watched_movies(username)
+    return {"success": True, "data": {"watched_movies": watched_movies}}
+
+
+@print_log
+@app.delete("/movies/{username}/{title}")
+def delete_movie(username: str, title: str):
+    success = movies.delete_movie(username, title)
+    return {"success": success}
+
+
+@print_log
+@app.post("/movies/{username}")
+def add_movie(username: str, movie: MovieScheme):
+    movies.add_movie(username=username, query=movie.query)  # type: ignore
+    return {"success": True, "message": "Movie successfully added."}
+
+
+@print_log
+@app.get("/movies/recommendations/{username}")
+def get_recommendations(username: str):
+    recommendations = fetch_recommendations(movies.get_top_genres(username))
+    return {"success": True, "data": {"recommendations": recommendations}}

@@ -120,11 +120,11 @@ class User(Base):
     last_seen = Column(
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat
     )
-    watched = relationship("Watched", back_populates="user")
+    movies = relationship("Movies", back_populates="user")
 
 
-class Watched(Base):
-    __tablename__ = "watched_movies"
+class Movies(Base):
+    __tablename__ = "movies"
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
@@ -133,10 +133,11 @@ class Watched(Base):
     overview = Column(String, nullable=True)
     genre_ids = Column(String, nullable=False)
     vote_average = Column(String, nullable=True)
-    watched_at = Column(
+    status = Column(String, nullable=False, default="Not yet")
+    Movies_at = Column(
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
-    user = relationship("User", back_populates="watched")
+    user = relationship("User", back_populates="movies")
 
 
 class UserManager:
@@ -226,7 +227,8 @@ class UserManager:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             raise UserNotFoundError(username)
-        session.delete(user)
+        if hasattr(user, "is_deleted"):
+            setattr(user, "is_deleted", True)
         logger.info(f"Deleted user: {user.username}")
         return True
 
@@ -284,23 +286,29 @@ class MovieManager:
         with self.session() as session:
             user = session.query(User).filter_by(username=username).first()
             if user and user is not None:
-                for movie in user.watched:
+                for movie in user.Movies:
                     genre_ids += "," + movie.genre_ids
         genre_ids = genre_ids.strip(",")
         if not genre_ids or genre_ids is None:
-            logger.error(f"User {username} haven't watched any movie yet!")
+            logger.error(f"User {username} haven't Movies any movie yet!")
             return []
         ids = [int(i) for i in genre_ids.split(",")]
         count = Counter(ids)
         top_genres = [item for item, _ in count.most_common(5)]
         return top_genres
 
+    def get_Movies_movies(self, username: str) -> list[Movies]:
+        user = session.query(User).filter_by(username=username).first()
+        if not user:
+            raise UserNotFoundError(username)
+        return user.Movies
+
     @transaction
     def delete_movie(self, session, username: str, query: str) -> bool:
         user = session.query(User).filter_by(username=username).first()
         data = fetch_tmdb_data(query)
         is_exist = (
-            session.query(Watched)
+            session.query(Movies)
             .filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id"))
             .first()
         )
@@ -317,20 +325,21 @@ class MovieManager:
         user = session.query(User).filter_by(username=username).first()
         data = fetch_tmdb_data(query)
         is_exist = (
-            session.query(Watched)
+            session.query(Movies)
             .filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id"))
             .first()
         )
         if is_exist:
             raise MovieAlreadyExists(data.get("title"))  # type:ignore
         if user and user is not None:
-            watched_at = datetime.now(timezone.utc).isoformat()
-            movie = Watched(
+            Movies_at = datetime.now(timezone.utc).isoformat()
+            movie = Movies(
                 user_id=user.id,
                 tmdb_id=data.get("tmdb_id"),
                 title=data.get("title"),
                 overview=data.get("overview"),
                 genre_ids=data.get("genre_ids"),
+                is_watched="Not yet",
                 vote_average=data.get("vote_average"),
                 watched_at=watched_at,
             )
