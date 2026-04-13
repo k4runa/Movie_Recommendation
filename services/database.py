@@ -286,7 +286,7 @@ class MovieManager:
         with self.session() as session:
             user = session.query(User).filter_by(username=username).first()
             if user and user is not None:
-                for movie in user.Movies:
+                for movie in user.movies:
                     genre_ids += "," + movie.genre_ids
         genre_ids = genre_ids.strip(",")
         if not genre_ids or genre_ids is None:
@@ -301,7 +301,7 @@ class MovieManager:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             raise UserNotFoundError(username)
-        return user.Movies
+        return user.movies
 
     @transaction
     def delete_movie(self, session, username: str, query: str) -> bool:
