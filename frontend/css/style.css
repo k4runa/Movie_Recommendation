@@ -319,6 +319,46 @@ input:focus {
     pointer-events: none;
 }
 
+/* Admin Table */
+.table-responsive {
+    overflow-x: auto;
+    margin-top: 1rem;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.admin-table th, .admin-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--glass-border);
+    font-size: 0.9rem;
+}
+
+.admin-table th {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.admin-table tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    background: rgba(138, 43, 226, 0.2);
+    color: #c084fc;
+    display: inline-block;
+}
+
 /* Form layouts */
 .flex-row {
     display: flex;

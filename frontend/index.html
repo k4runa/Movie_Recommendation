@@ -67,6 +67,7 @@
                 <button class="tab-btn active" data-target="tab-watched">My Movies</button>
                 <button class="tab-btn" data-target="tab-recommend">Recommendations</button>
                 <button class="tab-btn" data-target="tab-add">Add Movie</button>
+                <button class="tab-btn hidden" data-target="tab-admin" id="btn-admin-tab" style="color: var(--primary);">👑 Admin Panel</button>
             </div>
 
             <!-- Watched Movies Tab -->
@@ -104,6 +105,30 @@
                     <button type="submit" class="btn btn-primary btn-large">Track Movie</button>
                 </form>
                 <div id="add-msg" class="msgbox hidden"></div>
+            </section>
+
+             <!-- Admin Tab -->
+            <section id="tab-admin" class="tab-content hidden">
+                 <div class="section-header">
+                    <h3 class="gradient-text" style="background: linear-gradient(90deg, #f59e0b, #ef4444); -webkit-background-clip: text;">Admin Control Center</h3>
+                    <p>System users metadata and management.</p>
+                </div>
+                <div id="loading-admin" class="loading hidden">Fetching system users...</div>
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username / Email</th>
+                                <th>Device / IP</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-tbody">
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
         </main>

@@ -29,7 +29,11 @@ def register(user: UserScheme):
 
 @router.get("", response_model=APIResponseUsersList)
 @print_log
-def get_all_users(skip: int = 0, limit: int = 10):
+def get_all_users(skip: int = 0, limit: int = 10, current_user: dict = Depends(get_current_user)):
+    user_in_db = users_manager.get_user_by_username(current_user["username"]) # type: ignore
+    if user_in_db.get("role") != "admin":
+         raise HTTPException(status_code=403, detail="Admin privileges required")
+         
     logger.info(f"Fetching users with skip={skip}, limit={limit}...")
     all_users = users_manager.get_all_users(skip=skip, limit=limit)  # type: ignore
     return {"success": True, "data": {"users": all_users}}

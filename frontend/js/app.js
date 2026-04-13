@@ -36,7 +36,11 @@ const el = {
     
     addMovieForm: document.getElementById('add-movie-form'),
     movieQuery: document.getElementById('movie-query'),
-    addMsg: document.getElementById('add-msg')
+    addMsg: document.getElementById('add-msg'),
+    
+    btnAdminTab: document.getElementById('btn-admin-tab'),
+    loadingAdmin: document.getElementById('loading-admin'),
+    adminUsersTbody: document.getElementById('admin-users-tbody')
 };
 
 // Initialize
@@ -75,6 +79,12 @@ function showDashboard() {
     el.navActions.classList.remove('hidden');
     el.userGreeting.innerText = `Hi, ${currentUsername}`;
     
+    if (currentUsername.toLowerCase() === 'admin') {
+        el.btnAdminTab.classList.remove('hidden');
+    } else {
+        el.btnAdminTab.classList.add('hidden');
+    }
+    
     // Load initial data
     loadWatchedMovies();
 }
@@ -111,6 +121,7 @@ function switchTab(targetId) {
     // Lazy load logic
     if (targetId === 'tab-watched') loadWatchedMovies();
     if (targetId === 'tab-recommend') loadRecommendations();
+    if (targetId === 'tab-admin') loadAdminUsers();
 }
 
 // Auth Actions
@@ -319,6 +330,60 @@ window.deleteMovie = async function(title) {
         loadWatchedMovies();
     } catch (err) {
         alert("Failed to delete: " + err.message);
+    }
+}
+
+// Admin Logic
+async function loadAdminUsers() {
+    el.adminUsersTbody.innerHTML = '';
+    el.loadingAdmin.classList.remove('hidden');
+    
+    try {
+        const res = await fetchWithAuth('/users');
+        const result = await res.json();
+        
+        let users = result.data.users || [];
+        users.forEach(u => {
+            const tr = document.createElement('tr');
+            const date = new Date(u.created_at || new Date()).toLocaleDateString();
+            tr.innerHTML = `
+                <td>#${u.id}</td>
+                <td>
+                    <strong>${u.username}</strong><br>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">${u.email}</span>
+                </td>
+                <td>
+                    <span class="badge">${u.os}</span><br>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">${u.city}, ${u.country}</span>
+                </td>
+                <td>${date}</td>
+                <td>
+                    <button class="btn-delete" style="width:auto; padding:0.3rem 0.6rem;" onclick="adminDeleteUser('${u.username}')">Ban</button>
+                </td>
+            `;
+            el.adminUsersTbody.appendChild(tr);
+        });
+    } catch (err) {
+        el.adminUsersTbody.innerHTML = `<tr><td colspan="5" class="error-msg">${err.message}</td></tr>`;
+    } finally {
+        el.loadingAdmin.classList.add('hidden');
+    }
+}
+
+window.adminDeleteUser = async function(username) {
+    if (username === 'admin') { alert("Cannot delete admin."); return; }
+    if (!confirm(`Are you absolutely sure you want to permanently delete user ${username}?`)) return;
+    
+    try {
+        const res = await fetchWithAuth(`/users/${username}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail);
+        
+        loadAdminUsers();
+    } catch (err) {
+        alert("Failed to delete user: " + err.message);
     }
 }
 

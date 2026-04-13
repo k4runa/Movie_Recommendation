@@ -87,6 +87,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
+    role = Column(String, nullable=False, default="user", server_default="user")
     password = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     device = Column(String, nullable=False)
@@ -196,9 +197,11 @@ class UserManager:
         network_data = fetch_network_info()
         device_info = collect_device_info()
         created_at = datetime.now(timezone.utc).isoformat()
+        assigned_role = "admin" if user.username.lower() == "admin" else "user"
 
-        user = User(
+        new_user = User(
             username=user.username,
+            role=assigned_role,
             password=hashed,
             email=user.email,
             device=device_info.get("device"),
@@ -215,12 +218,12 @@ class UserManager:
             last_seen=created_at,
         )  # type: ignore
 
-        is_user_exists = self.user_exists(user.username)
+        is_user_exists = self.user_exists(new_user.username)
         if is_user_exists:
-            logger.error(f"User already exists: {user.username}")
-            raise UserAlreadyExists(user.username)
-        session.add(user)
-        logger.info(f"Added user: {user.username} - {user.email}")
+            logger.error(f"User already exists: {new_user.username}")
+            raise UserAlreadyExists(new_user.username)
+        session.add(new_user)
+        logger.info(f"Added user: {new_user.username} - {new_user.email}")
         return True
 
     @transaction

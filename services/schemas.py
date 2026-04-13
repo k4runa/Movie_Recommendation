@@ -58,4 +58,4 @@ class APIResponseUsersList(BaseModel):
 
 class APIResponseWatchedMoviesList(BaseModel):
     success: bool
-    data: dict[str, List[WatchedMovieResponse]]
+    data: dict[str, List[MovieResponse]]
