@@ -1,6 +1,6 @@
 """
 routers/auth.py — Authentication Endpoints
-============================================
+
 Handles user login via OAuth2-compatible form submission.
 
 Endpoints:

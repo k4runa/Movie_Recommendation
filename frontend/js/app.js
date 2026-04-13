@@ -1,6 +1,6 @@
 /**
  * CineWave — Frontend Application (SPA)
- * =======================================
+ * 
  * A vanilla JavaScript single-page application that communicates with
  * the CineWave REST API.  No frameworks, no build step — just clean,
  * modular ES5+ code served as a static asset via FastAPI's StaticFiles.
@@ -27,9 +27,7 @@
 
 const API_BASE = ''; // Same origin — no CORS needed
 
-// =========================================================================
 // 1. STATE & DOM REFERENCES
-// =========================================================================
 
 /** JWT access token — persisted to localStorage for session continuity. */
 let currentToken = localStorage.getItem('access_token');
@@ -100,9 +98,7 @@ const el = {
 };
 
 
-// =========================================================================
 // 2. INITIALIZATION & EVENT BINDING
-// =========================================================================
 
 /**
  * Bootstrap the application.
@@ -136,9 +132,7 @@ function attachListeners() {
 }
 
 
-// =========================================================================
 // 3. UI STATE TOGGLES
-// =========================================================================
 
 /** Show the authentication form and hide the dashboard. */
 function showAuth() {
@@ -217,9 +211,7 @@ function switchTab(targetId) {
 }
 
 
-// =========================================================================
 // 4. AUTHENTICATION
-// =========================================================================
 
 /**
  * Handle the auth form submission.
@@ -302,9 +294,7 @@ function logout() {
 }
 
 
-// =========================================================================
 // 5. API HELPERS
-// =========================================================================
 
 /**
  * Wrapper around fetch() that injects the JWT Bearer token.
@@ -327,9 +317,7 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 
-// =========================================================================
 // 6. DATA FETCHING
-// =========================================================================
 
 /**
  * Fetch and render the user's tracked movies into the "My Movies" grid.
@@ -413,9 +401,7 @@ async function loadRecommendations() {
 }
 
 
-// =========================================================================
 // 7. MOVIE ACTIONS
-// =========================================================================
 
 /**
  * Core tracking function — sends a POST to add a movie by title.
@@ -510,9 +496,7 @@ window.deleteMovie = async function(title) {
 }
 
 
-// =========================================================================
 // 8. ADMIN PANEL
-// =========================================================================
 
 /**
  * Fetch all registered users and render them in the admin table.
@@ -579,7 +563,5 @@ window.adminDeleteUser = async function(username) {
 }
 
 
-// =========================================================================
 // BOOTSTRAP
-// =========================================================================
 init();

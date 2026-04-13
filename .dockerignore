@@ -1,9 +1,6 @@
-# ==========================================================================
 # .dockerignore
-# ==========================================================================
 # Files and directories excluded from the Docker build context.
 # Keeps the image lean and prevents secrets from being baked in.
-# ==========================================================================
 
 .git
 .env

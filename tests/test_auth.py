@@ -1,6 +1,6 @@
 """
 tests/test_auth.py — End-to-End Authentication Tests
-======================================================
+
 Validates the full authentication lifecycle:
     1. User registration    (POST /users)
     2. User login           (POST /login)

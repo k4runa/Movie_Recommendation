@@ -1,12 +1,9 @@
-# ==========================================================================
 # CineWave API — Python Dependencies
-# ==========================================================================
 # Only production dependencies are listed here.
 # Install with:  pip install -r requirements.txt
 #
 # To regenerate after adding a new package:
 #   pip freeze | grep -i "package_name"
-# ==========================================================================
 
 # --- Web Framework ---
 fastapi==0.135.3

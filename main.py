@@ -1,6 +1,6 @@
 """
 main.py — Application Entry Point
-==================================
+
 Bootstraps the FastAPI application, mounts route modules and the
 frontend SPA, and registers global exception handlers.
 

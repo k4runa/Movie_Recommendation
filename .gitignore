@@ -1,23 +1,29 @@
-# ==========================================================================
-# .gitignore — CineWave API
-# ==========================================================================
-
 # --- Python bytecode & caches ---
-__pycache__/
+
+**pycache**/
 *.py[cod]
 *$py.class
+*.so
 
 # --- Testing ---
 .pytest_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
 
 # --- Virtual environments ---
-venv/
 .venv/
+venv/
+ENV/
 env/
 
 # --- Secrets (NEVER commit these) ---
 .env
+.env.*
+!.env.example
 
 # --- Database files (regenerated at runtime) ---
 *.db
@@ -26,9 +32,50 @@ database/
 
 # --- IDE / OS specific ---
 .vscode/
+.antigravity/
 .idea/
+*.swp
+*.swo
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Logs ---
+*.log
+logs/
+pip-log.txt
+pip-delete-this-directory.txt
 
 # --- ML model weights (if any) ---
 *.pt
 *.pth
+*.ckpt
+
+# --- ML data / experiment outputs ---
+data/
+datasets/
+outputs/
+runs/
+wandb/
+mlruns/
+
+# --- Jupyter ---
+.ipynb_checkpoints
+
+# --- Build / distribution ---
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Caches ---
+.cache/
+*.cache
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- Misc ---
+*.bak
+*.tmp
+*.temp
