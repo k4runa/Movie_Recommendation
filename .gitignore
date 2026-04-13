@@ -1,6 +1,25 @@
-*.db
-**/__pycahce__
-*.pt 
-*.pth
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
 .env
-env
+
+# Databases
+*.db
+*.sqlite3
+database/
+
+# IDE / OS specific 
+.vscode/
+.idea/
+.DS_Store
+*.pt
+*.pth
