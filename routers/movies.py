@@ -46,5 +46,11 @@ def add_movie(username: str, movie: MovieScheme, current_user: dict = Depends(ge
 def get_recommendations(username: str, current_user: dict = Depends(get_current_user)):
     if current_user.get("username") != username:
          raise HTTPException(status_code=403, detail="Not authorized to access this resource")
+         
+    watched = movies_manager.get_watched_movies(username, skip=0, limit=1000)  # type: ignore
+    watched_tmdb_ids = {m.get("tmdb_id") for m in watched}
+    
     recommendations = fetch_recommendations(movies_manager.get_top_genres(username))
-    return {"success": True, "data": {"recommendations": recommendations}}
+    filtered_recs = [r for r in recommendations if r.get("tmdb_id") not in watched_tmdb_ids]
+    
+    return {"success": True, "data": {"recommendations": filtered_recs}}

@@ -5,6 +5,13 @@ let currentToken = localStorage.getItem('access_token');
 let currentUsername = localStorage.getItem('username');
 let isLoginMode = true;
 
+// UI Data States
+let dataLoaded = {
+    watched: false,
+    recs: false,
+    admin: false
+};
+
 // DOM Elements
 const el = {
     navActions: document.getElementById('nav-actions'),
@@ -118,10 +125,10 @@ function switchTab(targetId) {
     el.tabContents.forEach(content => content.classList.add('hidden'));
     document.getElementById(targetId).classList.remove('hidden');
     
-    // Lazy load logic
-    if (targetId === 'tab-watched') loadWatchedMovies();
-    if (targetId === 'tab-recommend') loadRecommendations();
-    if (targetId === 'tab-admin') loadAdminUsers();
+    // Memoized load logic to reduce flicker
+    if (targetId === 'tab-watched' && !dataLoaded.watched) loadWatchedMovies();
+    if (targetId === 'tab-recommend' && !dataLoaded.recs) loadRecommendations();
+    if (targetId === 'tab-admin' && !dataLoaded.admin) loadAdminUsers();
 }
 
 // Auth Actions
@@ -217,6 +224,8 @@ async function loadWatchedMovies() {
         const result = await res.json();
         
         const movies = result.data.watched_movies || [];
+        dataLoaded.watched = true;
+        
         if (movies.length === 0) {
             el.watchedGrid.innerHTML = `<p class="color-text-muted">You haven't tracked any movies yet.</p>`;
         } else {
@@ -252,6 +261,8 @@ async function loadRecommendations() {
         const result = await res.json();
         
         const recs = result.data.recommendations || [];
+        dataLoaded.recs = true;
+        
         if (recs.length === 0) {
             el.recsGrid.innerHTML = `<p class="color-text-muted">Track more movies to get personalized recommendations!</p>`;
         } else {
@@ -294,8 +305,14 @@ async function performMovieTracking(query) {
         el.addMsg.innerHTML = `<span class="success-msg">Movie tracked successfully!</span>`;
         el.movieQuery.value = '';
         
+        // Invalidate caches
+        dataLoaded.watched = false;
+        dataLoaded.recs = false;
+        
         // Return to watched tab automatically
         switchTab('tab-watched');
+        // Still call loadWatchedMovies explicitly to update the DOM if the user is already on the tab internally
+        loadWatchedMovies();
     } catch (err) {
         el.addMsg.innerHTML = `<span class="error-msg">${err.message}</span>`;
     }
@@ -328,6 +345,9 @@ window.deleteMovie = async function(title) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail);
+        
+        dataLoaded.watched = false;
+        dataLoaded.recs = false;
         
         // Reload silently
         loadWatchedMovies();

@@ -1,11 +1,11 @@
 :root {
-    --bg-dark: #0f111a;
-    --glass-bg: rgba(255, 255, 255, 0.03);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --primary: #8a2be2;
-    --secondary: #4169e1;
-    --text-light: #f4f4f5;
-    --text-muted: #a1a1aa;
+    --bg-dark: #09090b;
+    --glass-bg: #111113;
+    --glass-border: #27272a;
+    --primary: #f4f4f5;
+    --secondary: #a1a1aa;
+    --text-light: #fafafa;
+    --text-muted: #71717a;
     --danger: #ef4444;
     --success: #10b981;
 }
@@ -28,36 +28,9 @@ body {
     position: relative;
 }
 
-/* Background Orbs */
+/* Background Orbs Removed per request */
 .orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(120px);
-    z-index: -1;
-    opacity: 0.15;
-    animation: float 15s infinite alternate;
-}
-
-.orb-1 {
-    width: 500px;
-    height: 500px;
-    background: #6a1b9a;
-    top: -150px;
-    left: -150px;
-}
-
-.orb-2 {
-    width: 400px;
-    height: 400px;
-    background: #1565c0;
-    bottom: -100px;
-    right: -100px;
-    animation-delay: -5s;
-}
-
-@keyframes float {
-    0% { transform: translate(0, 0); }
-    100% { transform: translate(50px, 50px); }
+    display: none !important;
 }
 
 /* Main Container */
@@ -66,10 +39,8 @@ body {
     max-width: 1200px;
     min-height: 85vh;
     background: var(--glass-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--glass-border);
-    border-radius: 24px;
+    border-radius: 12px;
     padding: 2rem;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     display: flex;
@@ -78,9 +49,7 @@ body {
 
 /* Typography & Layouts */
 .gradient-text {
-    background: linear-gradient(90deg, #c084fc, #3b82f6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-light);
     font-weight: 800;
 }
 
@@ -122,13 +91,13 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    background: #27272a;
     color: white;
+    border: 1px solid #3f3f46;
 }
 
 .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px -10px var(--primary);
+    background: #3f3f46;
 }
 
 .btn-outline {
@@ -138,7 +107,7 @@ body {
 }
 
 .btn-outline:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: #27272a;
 }
 
 /* Auth View */
@@ -251,18 +220,18 @@ input:focus {
 }
 
 .movie-card {
-    background: rgba(255, 255, 255, 0.015);
+    background: #18181b;
     border: 1px solid var(--glass-border);
     border-radius: 8px;
     padding: 1.5rem;
-    transition: transform 0.3s ease, border-color 0.3s ease;
+    transition: transform 0.2s ease, border-color 0.2s ease;
     display: flex;
     flex-direction: column;
 }
 
 .movie-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    border-color: #3f3f46;
 }
 
 .movie-card h4 {
@@ -277,7 +246,7 @@ input:focus {
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-bottom: 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid #27272a;
     padding-bottom: 0.5rem;
 }
 
