@@ -1,6 +1,6 @@
 """
 services/auth.py — Authentication & Authorization
-===================================================
+
 Implements JWT-based authentication for the API.
 
 Flow:

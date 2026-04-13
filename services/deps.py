@@ -1,6 +1,6 @@
 """
 services/deps.py — Dependency Injection (Singleton Managers)
-=============================================================
+
 Creates singleton instances of UserManager and MovieManager that are
 shared across all request handlers via Python module-level imports.
 

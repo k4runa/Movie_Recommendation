@@ -1,13 +1,10 @@
-# ==========================================================================
 # CineWave API — Dockerfile
-# ==========================================================================
 # Multi-purpose container image for the FastAPI application.
 # Includes all Python dependencies, the frontend SPA, and Alembic
 # migration tooling.
 #
 # Build:  docker build -t cinewave-api .
 # Run:    docker run -p 8000:8000 --env-file .env cinewave-api
-# ==========================================================================
 
 FROM python:3.10-slim
 

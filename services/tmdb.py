@@ -1,6 +1,6 @@
 """
 services/tmdb.py — TMDB API Integration
-=========================================
+
 Provides functions to search for movies and discover recommendations
 via The Movie Database (TMDB) REST API.
 

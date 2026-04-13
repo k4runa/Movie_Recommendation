@@ -1,6 +1,6 @@
 """
 routers/users.py — User Management Endpoints
-==============================================
+
 CRUD operations for user accounts.  All mutating endpoints require a
 valid JWT and enforce ownership checks (a user can only access their
 own record, unless they hold the 'admin' role).
