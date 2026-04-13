@@ -1,3 +1,5 @@
+import collections
+from services import tmdb
 from services.tmdb import fetch_tmdb_data, fetch_recommendations
 from sqlalchemy import (
     Column,
@@ -20,6 +22,7 @@ import platform
 from datetime import datetime, timezone
 from collections import Counter
 from dotenv import load_dotenv
+from services.schemas import UserScheme, MovieScheme
 
 load_dotenv()
 
@@ -71,24 +74,7 @@ class MovieAlreadyExists(Exception):
         super().__init__(f"Movie {title} already exists - args=({args})")
 
 
-class UserScheme(BaseModel):
-    username: str
-    password: str
-    email: EmailStr
 
-    @field_validator("username")
-    @classmethod
-    def is_valid_username(cls, v):
-        if len(v) < 5:
-            raise ValueError("Username must be longer than 5 characters.")
-        forbidden = set("@-.!'?*)(/{}%+^&")
-        if forbidden & set(v):
-            raise ValueError("Username shouldn't have ant special characters.")
-        return v
-
-
-class MovieScheme(BaseModel):
-    query: str
 
 
 class User(Base):
@@ -134,20 +120,24 @@ class Movies(Base):
     genre_ids = Column(String, nullable=False)
     vote_average = Column(String, nullable=True)
     status = Column(String, nullable=False, default="Not yet")
-    watched_at = Column(
-        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    # watched_at = Column(
+    #    String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
+    # )
     user = relationship("User", back_populates="movies")
-    watched_movies = relationship("WatchedMovies", back_populates="movies")
+    watched_movies = relationship("WatchedMovies", back_populates="who_watched")
 
 
 class WatchedMovies(Base):
     __tablename__ = "watched_movies"
+
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("movies.user_id"))
-    """
-    soon...
-    """
+    title = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="Watched")
+    watched_at = Column(
+        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    who_watched = relationship("Movies", back_populates="watched_movies")
 
 
 class UserManager:
@@ -194,10 +184,11 @@ class UserManager:
 
         return wrapper
 
-    def user_exists(self, session, username: str) -> bool:
-        stmd = select(User).where(User.username == username)
-        user = session.execute(stmd).scalar_one_or_none()
-        return user is not None
+    def user_exists(self, username: str) -> bool:
+        with self.session() as session:
+            stmd = select(User).where(User.username == username)
+            user = session.execute(stmd).scalar_one_or_none()
+            return user is not None
 
     @transaction
     def add_user(self, session, user: UserScheme) -> bool:
@@ -224,7 +215,7 @@ class UserManager:
             last_seen=created_at,
         )  # type: ignore
 
-        is_user_exists = self.user_exists(session, user.username)
+        is_user_exists = self.user_exists(user.username)
         if is_user_exists:
             logger.error(f"User already exists: {user.username}")
             raise UserAlreadyExists(user.username)
@@ -242,26 +233,36 @@ class UserManager:
         logger.info(f"Deleted user: {user.username}")
         return True
 
-    def get_user_by_username(self, session, username: str) -> User:
+    @transaction
+    def get_user_by_username(self, session, username: str) -> dict:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             raise UserNotFoundError(username)
-        return user
+        return {c.name: getattr(user, c.name) for c in user.__table__.columns}
 
-    def get_user_by_id(self, session, id: int) -> User:
+    @transaction
+    def get_user_by_id(self, session, id: int) -> dict:
         user = session.query(User).filter_by(id=id).first()
         if not user:
-            raise UserNotFoundError(id)
-        return user
+            raise UserNotFoundError(str(id))
+        return {c.name: getattr(user, c.name) for c in user.__table__.columns}
 
-    def get_all_users(self, session) -> list[User]:
-        return session.query(User).all()
+    @transaction
+    def get_all_users(self, session) -> list[dict]:
+        users = session.query(User).all()
+        return [
+            {c.name: getattr(u, c.name) for c in u.__table__.columns} for u in users
+        ]
 
     @transaction
     def update_user_field(self, session, username: str, field: str, value: str) -> bool:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             raise UserNotFoundError(username)
+        if field.lower() == "password":
+            hashed = bcrypt.hashpw(field.encode("utf-8"), bcrypt.gensalt())
+            setattr(user, field, hashed)
+            return True
         setattr(user, field, value)
         session.commit()
         logger.info(f"Updated user: {user.username} - {field}: {value}")
@@ -307,11 +308,15 @@ class MovieManager:
         top_genres = [item for item, _ in count.most_common(5)]
         return top_genres
 
-    def get_watched_movies(self, username: str) -> list[Movies]:
+    @transaction
+    def get_watched_movies(self, session, username: str) -> list[dict]:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             raise UserNotFoundError(username)
-        return user.movies
+        return [
+            {c.name: getattr(m, c.name) for c in m.__table__.columns}
+            for m in user.movies
+        ]
 
     @transaction
     def delete_movie(self, session, username: str, query: str) -> bool:
@@ -331,6 +336,28 @@ class MovieManager:
         return False
 
     @transaction
+    def update_status(self, session, username: str, status: str, query: str) -> bool:
+        user = session.query(User).filter_by(username=username).first()
+        data = fetch_tmdb_data(query)
+        is_exists = (
+            session.query(Movies)
+            .filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id"))
+            .first()
+        )
+        if is_exists:
+            raise MovieAlreadyExists(data.get("title"))  # type: ignore
+        if user and user is not None:
+            movie = WatchedMovies(
+                user_id=user.id,
+                title=data.get("title"),
+                status=status,
+                watched_at=datetime.now(timezone.utc).isoformat(),
+            )
+            session.add(movie)
+            return True
+        raise UserNotFoundError(username)
+
+    @transaction
     def add_movie(self, session, username: str, query: str) -> bool:
         user = session.query(User).filter_by(username=username).first()
         data = fetch_tmdb_data(query)
@@ -342,16 +369,14 @@ class MovieManager:
         if is_exist:
             raise MovieAlreadyExists(data.get("title"))  # type:ignore
         if user and user is not None:
-            Movies_at = datetime.now(timezone.utc).isoformat()
             movie = Movies(
                 user_id=user.id,
                 tmdb_id=data.get("tmdb_id"),
                 title=data.get("title"),
                 overview=data.get("overview"),
                 genre_ids=data.get("genre_ids"),
-                is_watched="Not yet",
+                status="Not yet",
                 vote_average=data.get("vote_average"),
-                watched_at=watched_at,
             )
             session.add(movie)
             return True
