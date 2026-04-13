@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineWave - AI Movie Recommendations</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/ui/css/style.css">
+</head>
+<body>
+    <!-- Abstract Background Orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    
+    <div class="glass-container">
+        
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="logo">
+                <span class="gradient-text">CineWave</span> API
+            </div>
+            <div id="nav-actions" class="nav-actions hidden">
+                <span id="user-greeting" class="user-greeting"></span>
+                <button id="btn-logout" class="btn btn-outline">Logout</button>
+            </div>
+        </nav>
+
+        <!-- Authentication View -->
+        <main id="view-auth" class="view section-active">
+            <div class="auth-box">
+                <div class="auth-header">
+                    <h2 id="auth-title">Welcome Back</h2>
+                    <p id="auth-subtitle">Enter your details to dive into your movies.</p>
+                </div>
+                
+                <form id="auth-form" class="auth-form">
+                    <div class="input-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" required autocomplete="off" placeholder="jack123">
+                    </div>
+                    
+                    <div id="email-group" class="input-group hidden">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" placeholder="jack@example.com">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required placeholder="••••••••">
+                    </div>
+                    
+                    <button type="submit" id="btn-submit" class="btn btn-primary w-100">Sign In</button>
+                </form>
+                
+                <div class="auth-footer">
+                    <p id="auth-switch-text">New to CineWave? <span id="auth-switch-link" class="gradient-text cursor-pointer">Create Account</span></p>
+                </div>
+                <div id="auth-error" class="error-msg hidden"></div>
+            </div>
+        </main>
+
+        <!-- Dashboard View -->
+        <main id="view-dashboard" class="view hidden">
+            
+            <div class="tabs">
+                <button class="tab-btn active" data-target="tab-watched">My Movies</button>
+                <button class="tab-btn" data-target="tab-recommend">Recommendations ✨</button>
+                <button class="tab-btn" data-target="tab-add">Add Movie</button>
+            </div>
+
+            <!-- Watched Movies Tab -->
+            <section id="tab-watched" class="tab-content active">
+                <div class="section-header">
+                    <h3>Watched Collection</h3>
+                    <p>Movies you have tracked so far.</p>
+                </div>
+                <div id="loading-watched" class="loading hidden">Fetching your collection...</div>
+                <div id="watched-grid" class="movies-grid">
+                    <!-- Cards injected via JS -->
+                </div>
+            </section>
+
+            <!-- Recommendations Tab -->
+            <section id="tab-recommend" class="tab-content hidden">
+                 <div class="section-header">
+                    <h3>For You</h3>
+                    <p>Based on the top genres of your watched collection.</p>
+                </div>
+                <div id="loading-recs" class="loading hidden">Analyzing your taste with AI...</div>
+                <div id="recs-grid" class="movies-grid">
+                    <!-- Cards injected via JS -->
+                </div>
+            </section>
+
+             <!-- Add Movie Tab -->
+            <section id="tab-add" class="tab-content hidden">
+                 <div class="section-header">
+                    <h3>Track a new movie</h3>
+                    <p>Search for any movie title across the TMDB network.</p>
+                </div>
+                <form id="add-movie-form" class="flex-row">
+                    <input type="text" id="movie-query" placeholder="e.g. Inception, The Matrix..." required class="input-large">
+                    <button type="submit" class="btn btn-primary btn-large">Track Movie</button>
+                </form>
+                <div id="add-msg" class="msgbox hidden"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="/ui/js/app.js"></script>
+</body>
+</html>

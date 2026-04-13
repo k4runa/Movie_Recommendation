@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from services.database import (
     logger,
     UserAlreadyExists,
@@ -15,6 +16,13 @@ app = FastAPI(title="Movie Recommendation API")
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(movies.router)
+
+# Mount Frontend
+app.mount("/ui", StaticFiles(directory="frontend", html=True), name="frontend")
+
+@app.get("/")
+def redirect_to_ui():
+    return RedirectResponse(url="/ui")
 
 
 @app.exception_handler(RequestValidationError)
