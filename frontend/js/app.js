@@ -276,11 +276,8 @@ async function loadRecommendations() {
     }
 }
 
-async function handleAddMovie(e) {
-    e.preventDefault();
-    const query = el.movieQuery.value.trim();
-    if (!query) return;
-    
+async function performMovieTracking(query) {
+    el.addMsg.classList.remove('hidden');
     el.addMsg.className = 'msgbox';
     el.addMsg.innerHTML = "Searching and applying...";
     
@@ -304,15 +301,21 @@ async function handleAddMovie(e) {
     }
 }
 
+async function handleAddMovie(e) {
+    e.preventDefault();
+    const query = el.movieQuery.value.trim();
+    if (!query) return;
+    await performMovieTracking(query);
+}
+
 window.quickTrack = function(btnElement, title) {
     el.movieQuery.value = title;
     btnElement.innerText = "Submitting...";
     btnElement.classList.add('btn-processing');
     
-    // Slight timeout so UI updates before native form submit freezes it
     setTimeout(() => {
         switchTab('tab-add');
-        el.addMovieForm.dispatchEvent(new Event('submit'));
+        performMovieTracking(title);
     }, 200);
 }
 
