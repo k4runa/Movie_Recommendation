@@ -16,23 +16,23 @@ A production-ready RESTful API for tracking personal movie collections and gener
 
 ---
 
-## 🚀 Features
+## Features
 
-| Category                     | Details                                                                                                                     |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 🔐 **Authentication**        | Secure JWT Bearer tokens via `PyJWT` + `bcrypt`. OAuth2-compatible flow.                                                    |
-| 👥 **User Management**       | Full CRUD with soft-delete. Automatic role assignment (`admin` vs `user`).                                                  |
-| 🎬 **Collection Tracking**   | Real-time TMDB search. Add/Remove movies to your "Watched" or "To Watch" list.                                              |
-| 🧠 **Recommendation Engine** | Genre-based discovery algorithm. Analyzes your watch history categories and discovers similar trending titles via TMDB API. |
-| 🛡️ **Ownership & Privacy**   | Strict ownership enforcement. Users can only access and modify their own collections.                                       |
-| 🛠️ **Admin Oversight**       | Powerful admin dashboard to manage users, view device metadata, and enforce community standards.                            |
-| 📱 **Responsive UI**         | Flicker-free Single Page App (SPA) with a premium Zinc dark theme and smooth transitions.                                   |
-| 📦 **Infrastructure**        | Fully containerized with Docker. Zero-config deployment via Docker Compose.                                                 |
-| 🧪 **Test Suite**            | Comprehensive E2E tests using `pytest` and `TestClient`.                                                                    |
+| Category                  | Details                                                                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Authentication**        | Secure JWT Bearer tokens via `PyJWT` + `bcrypt`. OAuth2-compatible flow.                                                    |
+| **User Management**       | Full CRUD with soft-delete. Automatic role assignment (`admin` vs `user`).                                                  |
+| **Collection Tracking**   | Real-time TMDB search. Add/Remove movies to your "Watched" or "To Watch" list.                                              |
+| **Recommendation Engine** | Genre-based discovery algorithm. Analyzes your watch history categories and discovers similar trending titles via TMDB API. |
+| **Ownership & Privacy**   | Strict ownership enforcement. Users can only access and modify their own collections.                                       |
+| **Admin Oversight**       | Powerful admin dashboard to manage users, view device metadata, and enforce community standards.                            |
+| **Responsive UI**         | Flicker-free Single Page App (SPA) with a premium Zinc dark theme and smooth transitions.                                   |
+| **Infrastructure**        | Fully containerized with Docker. Zero-config deployment via Docker Compose.                                                 |
+| **Test Suite**            | Comprehensive E2E tests using `pytest` and `TestClient`.                                                                    |
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 .
@@ -58,7 +58,7 @@ A production-ready RESTful API for tracking personal movie collections and gener
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Backend:** FastAPI (Python 3.10+)
 - **ORM / DB:** SQLAlchemy 2.0 with SQLite
@@ -69,7 +69,7 @@ A production-ready RESTful API for tracking personal movie collections and gener
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ### 1. Requirements
 
@@ -120,5 +120,5 @@ Register with the username `admin` to gain automatic administrative privileges. 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ for Movie Lovers.</sub>
+  <sub>Built for Movie Lovers.</sub>
 </div>
