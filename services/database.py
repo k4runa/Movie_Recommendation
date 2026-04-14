@@ -120,6 +120,13 @@ class UserAlreadyExists(Exception):
         super().__init__(f"User {username} already exists - args=({args})")
 
 
+class ReservedUsernameError(Exception):
+    """Raised when attempting to register a restricted username (e.g. admin)."""
+
+    def __init__(self, username: str, *args: object) -> None:
+        super().__init__(f"Username {username} is reserved and cannot be registered.")
+
+
 class UserNotFoundError(Exception):
     """Raised when a database lookup for a user yields no results."""
 
@@ -236,6 +243,12 @@ class WatchedMovies(Base):
 
 
 # ---------------------------------------------------------------------------
+# Global Constants
+# ---------------------------------------------------------------------------
+RESERVED_USERNAMES = {"admin", "root", "system", "superuser", "administrator"}
+
+
+# ---------------------------------------------------------------------------
 # UserManager
 # ---------------------------------------------------------------------------
 
@@ -333,14 +346,19 @@ class UserManager:
 
         Raises:
             UserAlreadyExists: If the username is already taken.
+            ReservedUsernameError: If the username is in the reserved list.
         """
+        if user.username.lower() in RESERVED_USERNAMES:
+            raise ReservedUsernameError(user.username)
+
         hashed = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
         network_data = fetch_network_info()
         device_info = collect_device_info()
         created_at = datetime.now(timezone.utc).isoformat()
 
-        # Auto-promote the 'admin' username to the admin role
-        assigned_role = "admin" if user.username.lower() == "admin" else "user"
+        # Registration now always defaults to the 'user' role.
+        # Admins must be seeded via environment variables or promoted by an existing admin.
+        assigned_role = "user"
 
         new_user = User(
             username=user.username,
@@ -361,10 +379,10 @@ class UserManager:
             last_seen=created_at,
         )  # type: ignore
 
-        is_user_exists = self.user_exists(new_user.username) #type: ignore
+        is_user_exists = self.user_exists(new_user.username)  # type: ignore
         if is_user_exists:
             logger.error(f"User already exists: {new_user.username}")
-            raise UserAlreadyExists(new_user.username) #type: ignore
+            raise UserAlreadyExists(new_user.username)  # type: ignore
         session.add(new_user)
         logger.info(f"Added user: {new_user.username} - {new_user.email}")
         return True
@@ -387,6 +405,53 @@ class UserManager:
             setattr(user, "is_deleted", True)
         logger.info(f"Deleted user: {user.username}")
         return True
+
+    @transaction
+    def ensure_admin_exists(self, session) -> None:
+        """
+        Ensures at least one admin exists in the system.
+
+        Reads INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD, and
+        INITIAL_ADMIN_EMAIL from environment variables. If no user with the
+        'admin' role exists, it creates one using these credentials.
+
+        This is intended to be called at application startup.
+        """
+        admin_exists = session.query(User).filter(User.role == "admin").first()
+        if admin_exists:
+            logger.info("Admin account already exists. Skipping seed.")
+            return
+
+        import os
+
+        username = os.getenv("INITIAL_ADMIN_USERNAME")
+        password = os.getenv("INITIAL_ADMIN_PASSWORD")
+        email = os.getenv("INITIAL_ADMIN_EMAIL")
+
+        if not username or not password or not email:
+            logger.warning(
+                "Initial admin credentials not fully provided in .env. "
+                "Skipping superuser seeding."
+            )
+            return
+
+        # Seed the superuser
+        hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+        created_at = datetime.now(timezone.utc).isoformat()
+
+        new_admin = User(
+            username=username,
+            password=hashed,
+            email=email,
+            role="admin",
+            is_deleted=False,
+            created_at=created_at,
+            city="System",
+            country="System",
+            ip="127.0.0.1",
+        )
+        session.add(new_admin)
+        logger.info(f"Successfully seeded superuser: {username}")
 
     @transaction
     def get_user_by_username(self, session, username: str) -> dict:

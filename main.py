@@ -15,13 +15,31 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 from services.database import (
     logger,
     UserAlreadyExists,
     UserNotFoundError,
     MovieAlreadyExists,
+    ReservedUsernameError,
 )
+from services.deps import users_manager
 from routers import auth, users, movies
+
+# ---------------------------------------------------------------------------
+# Lifespan Management
+# ---------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Handles startup and shutdown events.
+    At startup, ensures that at least one admin account is seeded.
+    """
+    logger.info("Application startup: Seeding admin if necessary...")
+    users_manager.ensure_admin_exists()  # type: ignore
+    yield
+    logger.info("Application shutdown.")
+
 
 # ---------------------------------------------------------------------------
 # Application Factory
@@ -30,6 +48,7 @@ app = FastAPI(
     title="Movie Recommendation API",
     description="A production-ready RESTful API for tracking personal movie collections and generating genre-based recommendations via TMDB.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # ---------------------------------------------------------------------------
@@ -90,6 +109,16 @@ async def movie_exists_handler(request: Request, exc: MovieAlreadyExists):
     """Return 409 when the movie is already in the user's tracked list."""
     logger.warning(f"{request.method} {request.url} -> {exc}")
     return JSONResponse(status_code=409, content={"detail": "Movie already exists"})
+
+
+@app.exception_handler(ReservedUsernameError)
+async def reserved_username_handler(request: Request, exc: ReservedUsernameError):
+    """Return 400 when attempting to register a restricted username."""
+    logger.warning(f"{request.method} {request.url} -> {exc}")
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
+    )
 
 
 @app.exception_handler(Exception)
