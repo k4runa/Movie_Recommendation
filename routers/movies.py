@@ -21,6 +21,7 @@ from services.deps import movies_manager
 from services.database import logger
 from services.auth import get_current_user
 from services.tmdb import fetch_recommendations
+from services.ai import ai_service
 from functools import wraps
 
 router = APIRouter(prefix="/movies", tags=["movies"])
@@ -112,7 +113,9 @@ def add_movie(
 
 @router.get("/recommendations/{username}")
 @print_log
-def get_recommendations(username: str, current_user: dict = Depends(get_current_user)):
+async def get_recommendations(
+    username: str, current_user: dict = Depends(get_current_user)
+):
     """
     Generate personalized movie recommendations for the authenticated user.
 
@@ -146,5 +149,41 @@ def get_recommendations(username: str, current_user: dict = Depends(get_current_
 
     # Shuffle for variety — prevents the same order on every page load
     random.shuffle(filtered_recs)
+    final_recs = filtered_recs[:10]
 
-    return {"success": True, "data": {"recommendations": filtered_recs[:10]}}
+    # Optionally enrich with AI-generated explanations if Gemini is active
+    if ai_service.active and watched:
+        watched_titles = [m.get("title") for m in watched[-10:]]  # Use last 10 for context
+        explanations = await ai_service.explain_recommendations(watched_titles, final_recs)
+        for r in final_recs:
+            r["ai_reason"] = explanations.get(r.get("title"))
+
+    return {"success": True, "data": {"recommendations": final_recs}}
+
+
+@router.get("/ai-insights/{username}")
+@print_log
+async def get_ai_insights(username: str, current_user: dict = Depends(get_current_user)):
+    """
+    Generate a personalized movie taste profile using Gemini AI.
+    Analyzes the user's watch history (titles + overviews) to describe
+    their cinematic personality.
+    """
+    if current_user.get("username") != username:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access this resource"
+        )
+
+    if not ai_service.active:
+        return {"success": False, "message": "AI service is not configured."}
+
+    # Fetch last 20 movies for analysis context
+    watched = movies_manager.get_watched_movies(username, skip=0, limit=20)  # type: ignore
+    if not watched:
+        return {
+            "success": True,
+            "data": {"insight": "Start tracking some movies to get AI insights!"},
+        }
+
+    insight = await ai_service.analyze_user_taste(watched)
+    return {"success": True, "data": {"insight": insight}}

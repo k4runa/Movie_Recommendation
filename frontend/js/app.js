@@ -94,7 +94,10 @@ const el = {
     // Admin tab
     btnAdminTab: document.getElementById('btn-admin-tab'),
     loadingAdmin: document.getElementById('loading-admin'),
-    adminUsersTbody: document.getElementById('admin-users-tbody')
+    adminUsersTbody: document.getElementById('admin-users-tbody'),
+
+    // AI Components
+    aiInsightsContainer: document.getElementById('ai-insights-container')
 };
 
 
@@ -367,27 +370,46 @@ async function loadWatchedMovies() {
  */
 async function loadRecommendations() {
     el.loadingRecs.classList.remove('hidden');
+    el.aiInsightsContainer.classList.add('hidden');
     
     try {
-        const res = await fetchWithAuth(`/movies/recommendations/${currentUsername}`);
-        const result = await res.json();
+        // Parallel fetch for speed
+        const [recsRes, insightsRes] = await Promise.all([
+            fetchWithAuth(`/movies/recommendations/${currentUsername}`),
+            fetchWithAuth(`/movies/ai-insights/${currentUsername}`)
+        ]);
+
+        const result = await recsRes.json();
+        const insightsResult = await insightsRes.json();
         
         el.recsGrid.innerHTML = '';
         const recs = result.data.recommendations || [];
         dataLoaded.recs = true;
-        
+
+        // Render AI Insights Profile
+        if (insightsResult.success && insightsResult.data.insight) {
+            el.aiInsightsContainer.innerHTML = `<strong>AI Movie Personality:</strong> ${insightsResult.data.insight}`;
+            el.aiInsightsContainer.classList.remove('hidden');
+        }
+
         if (recs.length === 0) {
             el.recsGrid.innerHTML = `<p class="color-text-muted">Track more movies to get personalized recommendations!</p>`;
         } else {
             recs.forEach(m => {
                 const card = document.createElement('div');
                 card.className = 'movie-card';
+                
+                const aiReasonHtml = m.ai_reason 
+                    ? `<div class="ai-reason">✨ <strong>AI Insight:</strong> ${m.ai_reason}</div>` 
+                    : '';
+
                 card.innerHTML = `
                     <h4>${m.title}</h4>
                     <div class="meta">
                         <span>Rating: ${m.vote_average || 'N/A'}</span>
                     </div>
                     <p class="desc-line">${m.overview || 'No description available for this title.'}</p>
+                    ${aiReasonHtml}
                     <button class="btn btn-outline w-100 rec-btn" onclick="quickTrack(this, '${m.title.replace(/'/g, "\\'") }')">+ Track Now</button>
                 `;
                 el.recsGrid.appendChild(card);

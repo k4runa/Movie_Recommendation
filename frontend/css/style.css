@@ -411,3 +411,28 @@ input:focus {
     font-style: italic;
     margin: 2rem 0;
 }
+
+/* --- AI Insights --- */
+.ai-box {
+    background-color: rgba(63, 63, 70, 0.2);
+    border: 1px solid #3f3f46;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
+.ai-box strong {
+    color: var(--primary);
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.ai-reason {
+    font-size: 0.8rem;
+    background: rgba(161, 161, 170, 0.1);
+    padding: 0.6rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+    border-left: 2px solid var(--secondary);
+}
