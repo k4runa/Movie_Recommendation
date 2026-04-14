@@ -5,7 +5,7 @@
 ![GitHub last commit](https://img.shields.io/github/last-commit/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
 ![GitHub top language](https://img.shields.io/github/languages/top/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
 ![GitHub repo size](https://img.shields.io/github/repo-size/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
-![Python Version](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Python Version](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.135+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 
 </div>
@@ -85,7 +85,7 @@ cd Movie_Recommendation
 cp .env.example .env  # If example exists, else create manually
 
 # Start the stack
-docker-compose up -d --build
+sudo docker-compose up -d --build
 ```
 
 ### 3. Localization
@@ -97,7 +97,7 @@ The API will be available at `http://localhost:8000`.
 
 ---
 
-## 🧪 Development & Testing
+## Development & Testing
 
 **Run Tests:**
 

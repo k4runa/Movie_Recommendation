@@ -1,4 +1,4 @@
-# CineWave API — Docker Compose
+# Movie Recommendation API — Docker Compose
 # Single-service stack for local development and lightweight deployment.
 #
 # Usage:
@@ -9,12 +9,11 @@
 # The .env file is loaded automatically for secrets (JWT key, TMDB API key).
 # The SQLite database is persisted via the bind-mounted volume.
 
-version: '3.8'
 
 services:
   api:
     build: .
-    container_name: cinewave_api
+    container_name: movie_api
     ports:
       - "8000:8000"
     volumes:
