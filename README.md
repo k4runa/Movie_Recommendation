@@ -60,7 +60,7 @@ A production-ready RESTful API for tracking personal movie collections and gener
 
 ## Tech Stack
 
-- **Backend:** FastAPI (Python 3.10+)
+- **Backend:** FastAPI (Python 3.12+)
 - **ORM / DB:** SQLAlchemy 2.0 with SQLite
 - **Migrations:** Alembic
 - **Frontend:** Vanilla JS, CSS3, Semantic HTML5
