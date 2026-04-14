@@ -115,7 +115,13 @@ alembic upgrade head
 
 ## Admin Panel
 
-Register with the username `admin` to gain automatic administrative privileges. You can then access the **Admin Panel** tab in the UI to manage the user base and view system analytics.
+Administrative access is managed securely via environment variables. To create the initial superuser:
+
+1.  Set `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD`, and `INITIAL_ADMIN_EMAIL` in your `.env` file.
+2.  Restart the application. The system will automatically seed the admin account if no admin exists.
+3.  Log in via the Web UI or `/login` endpoint.
+
+**Note:** The system reserves certain usernames (e.g., `admin`, `root`). Public registration with these names is disabled to prevent unauthorized access attempts.
 
 ---
 
