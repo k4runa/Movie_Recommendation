@@ -15,7 +15,6 @@ Key endpoints used:
 import os
 from typing import Any
 import requests
-from collections import Counter
 from dotenv import load_dotenv
 
 load_dotenv()

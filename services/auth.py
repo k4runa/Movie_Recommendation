@@ -57,11 +57,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     try:
         if isinstance(plain_password, str):
-            plain_password = plain_password.encode("utf-8")
+            plain_password = plain_password.encode("utf-8") #type: ignore
         if isinstance(hashed_password, str):
-            hashed_password = hashed_password.encode("utf-8")
+            hashed_password = hashed_password.encode("utf-8") #type: ignore
 
-        return bcrypt.checkpw(plain_password, hashed_password)
+        return bcrypt.checkpw(plain_password, hashed_password) #type: ignore
     except Exception as e:
         logger.error(f"Error checking password: {e}")
         return False
@@ -128,13 +128,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-
-        token_data = {"username": username}
-        return token_data
-
+        username: str = payload.get("sub") #type: ignore
+        if username:
+            token_data = {"username": username}
+            return token_data
+        raise credentials_exception
     except jwt.ExpiredSignatureError:
         logger.warning(f"Token expired for user validation.")
         raise HTTPException(

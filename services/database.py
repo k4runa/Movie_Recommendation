@@ -14,9 +14,7 @@ Design decisions:
       analytics purposes — this is intentional.
 """
 
-import collections
-from services import tmdb
-from services.tmdb import fetch_tmdb_data, fetch_recommendations
+from services.tmdb import fetch_tmdb_data
 from sqlalchemy import (
     Column,
     ForeignKey,
@@ -29,7 +27,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship, sessionmaker, DeclarativeBase
 from functools import wraps
 import logging
-from pydantic import EmailStr, BaseModel, field_validator
 import bcrypt
 import socket
 import requests
@@ -38,7 +35,7 @@ import platform
 from datetime import datetime, timezone
 from collections import Counter
 from dotenv import load_dotenv
-from services.schemas import UserScheme, MovieScheme
+from services.schemas import UserScheme
 
 load_dotenv()
 
@@ -239,9 +236,8 @@ class WatchedMovies(Base):
 
 
 # ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
 # UserManager
-# ---------------------------------------------------------------------------# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 
 class UserManager:
@@ -365,10 +361,10 @@ class UserManager:
             last_seen=created_at,
         )  # type: ignore
 
-        is_user_exists = self.user_exists(new_user.username)
+        is_user_exists = self.user_exists(new_user.username) #type: ignore
         if is_user_exists:
             logger.error(f"User already exists: {new_user.username}")
-            raise UserAlreadyExists(new_user.username)
+            raise UserAlreadyExists(new_user.username) #type: ignore
         session.add(new_user)
         logger.info(f"Added user: {new_user.username} - {new_user.email}")
         return True
@@ -456,11 +452,6 @@ class UserManager:
         session.commit()
         logger.info(f"Updated user: {user.username} - {field}: {value}")
         return True
-
-
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 
 
 class MovieManager:
