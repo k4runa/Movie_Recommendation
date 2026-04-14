@@ -1,8 +1,8 @@
 """
-services/ai.py — Gemini AI Integration Service
+services/ai.py — Google GenAI Integration Service
 
 Provides advanced movie taste analysis and personalized recommendation
-explanations using Google's Gemini Generative AI models.
+explanations using the modern Google GenAI SDK.
 
 Required Environment Variables:
     GEMINI_API_KEY: Your Google AI Studio API key.
@@ -10,44 +10,54 @@ Required Environment Variables:
 
 import os
 import logging
-import google.generativeai as genai
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
+
+# Try to import the new SDK
+try:
+    from google import genai
+    HAS_GENAI = True
+except ImportError:
+    HAS_GENAI = False
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Configure the Gemini SDK
+# Fetch API key
 api_key = os.getenv("GEMINI_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
-else:
-    logger.warning("GEMINI_API_KEY not found in environment. AI features will be disabled.")
-
 
 class AIService:
     """
     Handles communication with Google Gemini to provide intelligent
-    movie-related insights.
+    movie-related insights using the modern GenAI Client.
     """
 
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, model_name: str = "gemini-2.0-flash"):
         self.model_name = model_name
-        self.active = bool(api_key)
-
-    def _get_model(self):
-        return genai.GenerativeModel(self.model_name)
+        self.active = HAS_GENAI and bool(api_key)
+        self.client = None
+        
+        if self.active:
+            try:
+                # The Client manages authentication and provides access to all models
+                self.client = genai.Client(api_key=api_key)
+            except Exception as e:
+                logger.error(f"Failed to initialize GenAI Client: {e}")
+                self.active = False
+        elif not HAS_GENAI:
+            logger.info("google-genai package not installed. Gemini features disabled.")
+        else:
+            logger.warning("GEMINI_API_KEY not found in environment. AI features will be disabled.")
 
     async def analyze_user_taste(self, watched_movies: List[Dict[str, Any]]) -> Optional[str]:
         """
         Generates a professional summary of the user's movie preferences
-        based on their watch history.
+        based on their watch history using asynchronous content generation.
         """
-        if not self.active or not watched_movies:
+        if not self.active or not watched_movies or not self.client:
             return None
 
-        # Prepare the context
         movie_entries = [f"- {m.get('title')}: {m.get('overview', 'No overview available.')}" for m in watched_movies]
         context = "\n".join(movie_entries)
         
@@ -64,21 +74,23 @@ class AIService:
         """
 
         try:
-            model = self._get_model()
-            response = model.generate_content(prompt)
+            # Using the asynchronous 'aio' module of the new SDK
+            response = await self.client.aio.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             return response.text.strip()
         except Exception as e:
-            logger.error(f"Gemini API Error (analyze_user_taste): {e}")
+            logger.error(f"GenAI SDK Error (analyze_user_taste): {e}")
             return "Unable to analyze taste profile at this time."
 
     async def explain_recommendations(
         self, watched_titles: List[str], recommendations: List[Dict[str, Any]]
     ) -> Dict[str, str]:
         """
-        Generates a brief "Reason why" for each recommended movie based
-        on the user's history.
+        Generates a brief "Reason why" for each recommended movie.
         """
-        if not self.active or not watched_titles or not recommendations:
+        if not self.active or not watched_titles or not recommendations or not self.client:
             return {}
 
         rec_titles = [r.get("title") for r in recommendations]
@@ -93,24 +105,26 @@ class AIService:
         referencing their watch history where possible. 
         Keep it brief, persuasive, and professional.
         
-        Format the output as:
+        Format the output precisely as:
         Title: Reason
         Title: Reason
         """
 
         try:
-            model = self._get_model()
-            response = model.generate_content(prompt)
+            response = await self.client.aio.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             
-            # Parse the response into a dict
             explanations = {}
             for line in response.text.strip().split("\n"):
                 if ":" in line:
-                    title, reason = line.split(":", 1)
+                    parts = line.split(":", 1)
+                    title, reason = parts[0], parts[1]
                     explanations[title.strip()] = reason.strip()
             return explanations
         except Exception as e:
-            logger.error(f"Gemini API Error (explain_recommendations): {e}")
+            logger.error(f"GenAI SDK Error (explain_recommendations): {e}")
             return {}
 
 # Singleton instance
