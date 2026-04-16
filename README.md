@@ -45,6 +45,3 @@ The project includes a comprehensive test suite using `pytest`.
 ```bash
 pytest
 ```
-
-## 📄 License
-MIT License - see [LICENSE](LICENSE) for details.
