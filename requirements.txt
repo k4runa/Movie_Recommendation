@@ -11,10 +11,12 @@ uvicorn==0.44.0
 starlette==1.0.0
 python-multipart==0.0.26
 
-# --- Database ---
+# --- Database (PostgreSQL + Async) ---
 SQLAlchemy==2.0.49
 alembic==1.18.4
 greenlet==3.4.0
+asyncpg>=0.30.0
+psycopg2-binary>=2.9.9
 
 # --- Authentication & Security ---
 PyJWT==2.12.1
@@ -26,12 +28,10 @@ pydantic_core==2.41.5
 email-validator==2.3.0
 annotated-types==0.7.0
 
-# --- HTTP Client (TMDB API) ---
-requests==2.33.1
-urllib3==2.6.3
-certifi==2026.2.25
-charset-normalizer==3.4.7
+# --- HTTP Client (TMDB API — async) ---
+httpx==0.28.1
 idna==3.11
+certifi==2026.2.25
 
 # --- System Metadata Collection ---
 psutil==7.2.2
@@ -60,3 +60,4 @@ packaging==26.0
 dnspython==2.8.0
 # --- AI & General Intelligence ---
 google-genai
+groq==0.18.0

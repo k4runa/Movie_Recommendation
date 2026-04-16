@@ -1,8 +1,8 @@
 """
-services/tmdb.py — TMDB API Integration
+services/tmdb.py — TMDB API Integration (Async)
 
-Provides functions to search for movies and discover recommendations
-via The Movie Database (TMDB) REST API.
+Provides async functions to search for movies and discover recommendations
+via The Movie Database (TMDB) REST API using httpx.
 
 All functions read the API key from the API_KEY environment variable.
 TMDB docs: https://developer.themoviedb.org/reference/intro/getting-started
@@ -14,13 +14,13 @@ Key endpoints used:
 
 import os
 from typing import Any
-import requests
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
-def fetch_tmdb_data(query: str) -> dict[str, Any]:
+async def fetch_tmdb_data(query: str) -> dict[str, Any]:
     """
     Search TMDB for a movie by title and return the top result's metadata.
 
@@ -32,10 +32,12 @@ def fetch_tmdb_data(query: str) -> dict[str, Any]:
         Empty dict if no results are found.
     """
     api_key = os.getenv("API_KEY")
-    response: dict = requests.get(
-        f"https://api.themoviedb.org/3/search/movie?query={query}&api_key={api_key}"
-    ).json()
-    data = response.get("results", [])
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"https://api.themoviedb.org/3/search/movie?query={query}&api_key={api_key}"
+        )
+        data_response: dict = response.json()
+    data = data_response.get("results", [])
     if not data:
         return {}
     movie = data[0]
@@ -44,11 +46,11 @@ def fetch_tmdb_data(query: str) -> dict[str, Any]:
         "title": movie["title"],
         "overview": movie["overview"],
         "genre_ids": ",".join(str(g) for g in movie["genre_ids"]),
-        "vote_average": movie["vote_average"],
+        "vote_average": str(movie["vote_average"]),
     }
 
 
-def fetch_recommendations(genre_ids: list[int], limit: int = 5) -> list[dict[str, Any]]:
+async def fetch_recommendations(genre_ids: list[int], limit: int = 5) -> list[dict[str, Any]]:
     """
     Discover movies matching the given genre IDs via TMDB's /discover endpoint.
 
@@ -70,10 +72,12 @@ def fetch_recommendations(genre_ids: list[int], limit: int = 5) -> list[dict[str
     if limit > 20:
         raise ValueError("Limit should be less than 20")
     api_key = os.getenv("API_KEY")
-    genre_ids = ",".join(str(i) for i in genre_ids)  # type: ignore
-    response = requests.get(
-        f"https://api.themoviedb.org/3/discover/movie?with_genres={genre_ids}&api_key={api_key}"
-    ).json()
+    genre_str = ",".join(str(i) for i in genre_ids)
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"https://api.themoviedb.org/3/discover/movie?with_genres={genre_str}&api_key={api_key}"
+        )
+        response_data = response.json()
     return [
         {
             "tmdb_id": m["id"],
@@ -81,5 +85,5 @@ def fetch_recommendations(genre_ids: list[int], limit: int = 5) -> list[dict[str
             "vote_average": m["vote_average"],
             "overview": m["overview"],
         }
-        for m in response["results"][:limit]
+        for m in response_data["results"][:limit]
     ]

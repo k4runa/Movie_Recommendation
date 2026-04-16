@@ -1,130 +1,50 @@
-# Movie Recommendation API
+# 🎬 CineWave: Movie Recommendation API (Async + PostgreSQL)
 
-<div align="center">
+CineWave is a high-performance, asynchronous RESTful API built with FastAPI. It allows users to track their personal movie collections and receive AI-powered recommendations based on their watching history.
 
-![GitHub last commit](https://img.shields.io/github/last-commit/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
-![GitHub top language](https://img.shields.io/github/languages/top/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
-![GitHub repo size](https://img.shields.io/github/repo-size/k4runa/Movie_Recommendation?style=for-the-badge&color=5D5DFF)
-![Python Version](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.135+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+## 🚀 Key Features
 
-</div>
+-   **Fully Asynchronous:** Built on `FastAPI` and `SQLAlchemy (Async)` with `asyncpg` for non-blocking database operations.
+-   **PostgreSQL Support:** Production-ready database integration, fully containerized with `Docker Compose`.
+-   **Dual-AI Fallback:** Powered by `Google Gemini` (Primary) and `Groq/Llama-3` (Fallback). If one provider hits a quota limit, the system automatically switches to the alternative.
+-   **TMDB Integration:** Real-time movie data search and discovery using `httpx`.
+-   **JWT Authentication:** Secure user management and token-based authentication.
+-   **Production Infrastructure:** Health-checked Docker containers for both the API and the Database.
 
----
+## 🛠 Tech Stack
 
-A production-ready RESTful API for tracking personal movie collections and generating genre-based recommendations using data from [TMDB](https://www.themoviedb.org/). Features a modern, high-performance dark-themed SPA (Single Page Application) built with vanilla JavaScript.
+-   **Backend:** FastAPI, Python 3.10+
+-   **Database:** PostgreSQL 16
+-   **ORM:** SQLAlchemy 2.0 (Async)
+-   **Async HTTP:** httpx
+-   **AI Providers:** Google Gemini SDK, Groq SDK
+-   **Deployment:** Docker, Docker Compose
 
----
+## 🚦 Quick Start
 
-## Features
+### 1. Prerequisites
+-   Docker and Docker Compose installed.
+-   TMDB API Key.
+-   Gemini and/or Groq API Keys.
 
-| Category                  | Details                                                                                                                     |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Authentication**        | Secure JWT Bearer tokens via `PyJWT` + `bcrypt`. OAuth2-compatible flow.                                                    |
-| **User Management**       | Full CRUD with soft-delete. Automatic role assignment (`admin` vs `user`).                                                  |
-| **Collection Tracking**   | Real-time TMDB search. Add/Remove movies to your "Watched" or "To Watch" list.                                              |
-| **Recommendation Engine** | Genre-based discovery algorithm. Analyzes your watch history categories and discovers similar trending titles via TMDB API. |
-| **Ownership & Privacy**   | Strict ownership enforcement. Users can only access and modify their own collections.                                       |
-| **Admin Oversight**       | Powerful admin dashboard to manage users, view device metadata, and enforce community standards.                            |
-| **Responsive UI**         | Flicker-free Single Page App (SPA) with a premium Zinc dark theme and smooth transitions.                                   |
-| **Infrastructure**        | Fully containerized with Docker. Zero-config deployment via Docker Compose.                                                 |
-| **Test Suite**            | Comprehensive E2E tests using `pytest` and `TestClient`.                                                                    |
-
----
-
-## Project Structure
-
-```text
-.
-├── main.py                     # App entry point & global configurations
-├── alembic/                    # Database schema migration framework
-├── routers/                    # API route definitions (Modularized)
-│   ├── auth.py                 # JWT issuance & Login
-│   ├── users.py                # User profiles & Admin operations
-│   └── movies.py               # Movie tracking & Recommendations
-├── services/                   # Business logic & Core engines
-│   ├── auth.py                 # Token logic & Password hashing
-│   ├── database.py             # SQLAlchemy models & CRUD managers
-│   ├── schemas.py              # Pydantic validation & Serialization
-│   ├── deps.py                 # Dependency injection containers
-│   └── tmdb.py                 # TMDB API integration layer
-├── frontend/                   # Modern Web SPA
-│   ├── index.html              # Reactive HTML shell
-│   ├── css/style.css           # Premium dark theme design system
-│   └── js/app.js               # Tab-based SPA logic & API client
-├── tests/                      # Automated test suite
-└── Dockerfile                  # Production container definition
-```
-
----
-
-## Tech Stack
-
-- **Backend:** FastAPI (Python 3.12+)
-- **ORM / DB:** SQLAlchemy 2.0 with SQLite
-- **Migrations:** Alembic
-- **Frontend:** Vanilla JS, CSS3, Semantic HTML5
-- **Security:** JWT (JSON Web Tokens) & Bcrypt
-- **DevOps:** Docker, Docker Compose
-
----
-
-## Quick Start
-
-### 1. Requirements
-
-Ensure you have a **TMDB API Key** ([Get one here](https://www.themoviedb.org/settings/api)).
-
-### 2. Docker Setup (Recommended)
-
+### 2. Environment Setup
+Rename `.env.example` to `.env` and fill in your credentials:
 ```bash
-git clone https://github.com/k4runa/Movie_Recommendation.git
-cd Movie_Recommendation
-
-# Create .env and paste your credentials
-cp .env.example .env  # If example exists, else create manually
-
-# Start the stack
-sudo docker-compose up -d --build
+cp .env.example .env
 ```
 
-### 3. Localization
-
-The API will be available at `http://localhost:8000`.
-
-- **Web UI:** [http://localhost:8000/ui](http://localhost:8000/ui)
-- **Interactive Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-
----
-
-## Development & Testing
-
-**Run Tests:**
-
+### 3. Run with Docker
 ```bash
-python -m pytest tests/ -v
+docker-compose up -d --build
 ```
+The API will be available at `http://localhost:8000`.  
+Explore the interactive docs at `http://localhost:8000/docs`.
 
-**Apply Migrations:**
-
+## 🧪 Testing
+The project includes a comprehensive test suite using `pytest`.
 ```bash
-alembic upgrade head
+pytest
 ```
 
----
-
-## Admin Panel
-
-Administrative access is managed securely via environment variables. To create the initial superuser:
-
-1.  Set `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD`, and `INITIAL_ADMIN_EMAIL` in your `.env` file.
-2.  Restart the application. The system will automatically seed the admin account if no admin exists.
-3.  Log in via the Web UI or `/login` endpoint.
-
-**Note:** The system reserves certain usernames (e.g., `admin`, `root`). Public registration with these names is disabled to prevent unauthorized access attempts.
-
----
-
-<div align="center">
-  <sub>Built for Movie Lovers.</sub>
-</div>
+## 📄 License
+MIT License - see [LICENSE](LICENSE) for details.

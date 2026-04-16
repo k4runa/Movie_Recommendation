@@ -22,27 +22,8 @@ from services.database import logger
 from services.auth import get_current_user
 from services.tmdb import fetch_recommendations
 from services.ai import ai_service
-from functools import wraps
 
 router = APIRouter(prefix="/movies", tags=["movies"])
-
-
-# ---------------------------------------------------------------------------
-# Logging Decorator
-# ---------------------------------------------------------------------------
-
-
-def print_log(func):
-    """Lightweight decorator that logs function entry and exit."""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        logger.info(f"running function: {func.__name__}")
-        result = func(*args, **kwargs)
-        logger.info(f"done function: {func.__name__}")
-        return result
-
-    return wrapper
 
 
 # ---------------------------------------------------------------------------
@@ -51,8 +32,7 @@ def print_log(func):
 
 
 @router.get("/{username}/watched", response_model=APIResponseWatchedMoviesList)
-@print_log
-def get_watched_movies(
+async def get_watched_movies(
     username: str,
     skip: int = 0,
     limit: int = 10,
@@ -69,13 +49,12 @@ def get_watched_movies(
         raise HTTPException(
             status_code=403, detail="Not authorized to access this resource"
         )
-    watched_movies = movies_manager.get_watched_movies(username, skip=skip, limit=limit)  # type: ignore
+    watched_movies = await movies_manager.get_watched_movies(username, skip=skip, limit=limit)  # type: ignore
     return {"success": True, "data": {"watched_movies": watched_movies}}
 
 
 @router.delete("/{username}/{title}")
-@print_log
-def delete_movie(
+async def delete_movie(
     username: str, title: str, current_user: dict = Depends(get_current_user)
 ):
     """
@@ -88,13 +67,12 @@ def delete_movie(
         raise HTTPException(
             status_code=403, detail="Not authorized to access this resource"
         )
-    success = movies_manager.delete_movie(username, title)  # type: ignore
+    success = await movies_manager.delete_movie(username, title)  # type: ignore
     return {"success": success}
 
 
 @router.post("/{username}")
-@print_log
-def add_movie(
+async def add_movie(
     username: str, movie: MovieScheme, current_user: dict = Depends(get_current_user)
 ):
     """
@@ -107,12 +85,11 @@ def add_movie(
         raise HTTPException(
             status_code=403, detail="Not authorized to access this resource"
         )
-    movies_manager.add_movie(username=username, query=movie.query)  # type: ignore
+    await movies_manager.add_movie(username=username, query=movie.query)  # type: ignore
     return {"success": True, "message": "Movie successfully added."}
 
 
 @router.get("/recommendations/{username}")
-@print_log
 async def get_recommendations(
     username: str, current_user: dict = Depends(get_current_user)
 ):
@@ -134,13 +111,12 @@ async def get_recommendations(
         )
 
     # Fetch all tracked movies to build a set of IDs to exclude
-    watched = movies_manager.get_watched_movies(username, skip=0, limit=1000)  # type: ignore
+    watched = await movies_manager.get_watched_movies(username, skip=0, limit=1000)  # type: ignore
     watched_tmdb_ids = {m.get("tmdb_id") for m in watched}
 
     # Discover similar movies based on the user's top genres
-    recommendations = fetch_recommendations(
-        movies_manager.get_top_genres(username), limit=20
-    )
+    top_genres = await movies_manager.get_top_genres(username)
+    recommendations = await fetch_recommendations(top_genres, limit=20)
 
     # Remove already-tracked movies from the result set
     filtered_recs = [
@@ -162,7 +138,6 @@ async def get_recommendations(
 
 
 @router.get("/ai-insights/{username}")
-@print_log
 async def get_ai_insights(username: str, current_user: dict = Depends(get_current_user)):
     """
     Generate a personalized movie taste profile using Gemini AI.
@@ -178,7 +153,7 @@ async def get_ai_insights(username: str, current_user: dict = Depends(get_curren
         return {"success": False, "message": "AI service is not configured."}
 
     # Fetch last 20 movies for analysis context
-    watched = movies_manager.get_watched_movies(username, skip=0, limit=20)  # type: ignore
+    watched = await movies_manager.get_watched_movies(username, skip=0, limit=20)  # type: ignore
     if not watched:
         return {
             "success": True,
