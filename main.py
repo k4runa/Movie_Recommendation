@@ -33,10 +33,12 @@ from routers import auth, users, movies
 async def lifespan(app: FastAPI):
     """
     Handles startup and shutdown events.
-    At startup, ensures that at least one admin account is seeded.
+    At startup, creates database tables and ensures that at least one
+    admin account is seeded.
     """
-    logger.info("Application startup: Seeding admin if necessary...")
-    users_manager.ensure_admin_exists()  # type: ignore
+    logger.info("Application startup: Creating tables and seeding admin...")
+    await users_manager.create_tables()
+    await users_manager.ensure_admin_exists()  # type: ignore
     yield
     logger.info("Application shutdown.")
 
@@ -69,7 +71,7 @@ app.mount("/ui", StaticFiles(directory="frontend", html=True), name="frontend")
 
 
 @app.get("/", include_in_schema=False)
-def redirect_to_ui():
+async def redirect_to_ui():
     """Redirect bare root requests to the web interface."""
     return RedirectResponse(url="/ui")
 

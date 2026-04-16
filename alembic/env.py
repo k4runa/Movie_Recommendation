@@ -21,13 +21,17 @@ import sys
 
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
 from services.database import Base
+from dotenv import load_dotenv
+
+load_dotenv()
 
 target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Override sqlalchemy.url from environment variable if available.
+# Uses the SYNC driver (psycopg2) because Alembic runs migrations synchronously.
+database_url_sync = os.getenv("DATABASE_URL_SYNC")
+if database_url_sync:
+    config.set_main_option("sqlalchemy.url", database_url_sync)
 
 
 def run_migrations_offline() -> None:

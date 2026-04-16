@@ -1,5 +1,5 @@
 # Movie Recommendation API — Docker Compose
-# Single-service stack for local development and lightweight deployment.
+# Two-service stack: FastAPI application + PostgreSQL database.
 #
 # Usage:
 #   docker-compose up -d --build    # Build and start in background
@@ -7,10 +7,28 @@
 #   docker-compose down             # Stop and remove containers
 #
 # The .env file is loaded automatically for secrets (JWT key, TMDB API key).
-# The SQLite database is persisted via the bind-mounted volume.
+# PostgreSQL data is persisted via a named Docker volume.
 
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: movie_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cinewave}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cinewave_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-cinewave_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cinewave}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build: .
     container_name: movie_api
@@ -19,6 +37,13 @@ services:
     volumes:
       - .:/app                          # Live-reload during development
     environment:
-      - DB_PATH=database/database.db    # Override the default DB location
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cinewave}:${POSTGRES_PASSWORD:-cinewave_secret}@postgres:5432/${POSTGRES_DB:-cinewave_db}
+      - DATABASE_URL_SYNC=postgresql+psycopg2://${POSTGRES_USER:-cinewave}:${POSTGRES_PASSWORD:-cinewave_secret}@postgres:5432/${POSTGRES_DB:-cinewave_db}
     env_file:
       - .env                            # Secrets: JWT_SECRET_KEY, API_KEY, etc.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

@@ -1,15 +1,15 @@
 """
-services/database.py — Data Access Layer
+services/database.py — Async Data Access Layer (PostgreSQL)
 
 Defines the SQLAlchemy ORM models (User, Movies, WatchedMovies) and the
 manager classes (UserManager, MovieManager) that encapsulate all database
 operations behind clean, transactional interfaces.
 
 Design decisions:
-    • SQLite is used as the default datastore for portability; the engine
-      URL is injected via the DB_PATH environment variable.
+    • PostgreSQL via asyncpg is used as the primary datastore.
+    • The async engine URL is injected via the DATABASE_URL environment variable.
     • Every write operation is wrapped in an auto-commit / rollback
-      transaction decorator so callers never manage sessions directly.
+      async transaction decorator so callers never manage sessions directly.
     • Device and network metadata is collected at registration time for
       analytics purposes — this is intentional.
 """
@@ -20,16 +20,16 @@ from sqlalchemy import (
     ForeignKey,
     String,
     Integer,
-    create_engine,
     Boolean,
     select,
 )
-from sqlalchemy.orm import relationship, sessionmaker, DeclarativeBase
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import relationship, DeclarativeBase
 from functools import wraps
 import logging
 import bcrypt
 import socket
-import requests
+import httpx
 import psutil
 import platform
 from datetime import datetime, timezone
@@ -72,18 +72,21 @@ def collect_device_info() -> dict[str, str]:
     }
 
 
-def fetch_network_info() -> dict[str, str]:
+async def fetch_network_info() -> dict[str, str]:
     """
     Retrieve geolocation and IP data from the ipinfo.io API.
 
-    Falls back to 'unknown' values on network errors so that user
-    registration is never blocked by a third-party outage.
+    Uses httpx for non-blocking async HTTP calls. Falls back to 'unknown'
+    values on network errors so that user registration is never blocked
+    by a third-party outage.
 
     Returns:
         dict with keys: country, city, ip
     """
     try:
-        data: dict = requests.get("https://ipinfo.io/json").json()
+        async with httpx.AsyncClient() as client:
+            response = await client.get("https://ipinfo.io/json")
+            data: dict = response.json()
         return {
             "country": data.get("country", "unknown"),
             "city": data.get("city", "unknown"),
@@ -141,6 +144,13 @@ class MovieAlreadyExists(Exception):
         super().__init__(f"Movie {title} already exists - args=({args})")
 
 
+class MovieNotFoundError(Exception):
+    """Raised when a movie is not found in the user's tracked collection."""
+
+    def __init__(self, title: str, *args: object) -> None:
+        super().__init__(f"Movie {title} not found - args=({args})")
+
+
 # ---------------------------------------------------------------------------
 # ORM Models
 # ---------------------------------------------------------------------------
@@ -168,28 +178,28 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
 
     # --- Device fingerprint (collected at signup) ---
-    device = Column(String, nullable=False)
-    device_name = Column(String, nullable=False)
-    machine = Column(String, nullable=False)
-    os = Column(String, nullable=False)
-    memory = Column(String, nullable=False)
-    hostname = Column(String, nullable=False)
+    device = Column(String, nullable=True)
+    device_name = Column(String, nullable=True)
+    machine = Column(String, nullable=True)
+    os = Column(String, nullable=True)
+    memory = Column(String, nullable=True)
+    hostname = Column(String, nullable=True)
 
     # --- Network / geolocation ---
-    country = Column(String, nullable=False)
-    city = Column(String, nullable=False)
-    ip = Column(String, nullable=False)
+    country = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    ip = Column(String, nullable=True)
 
     # --- Account lifecycle ---
     is_deleted = Column(Boolean, nullable=False, default=False)
     created_at = Column(
-        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat
+        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
     last_seen = Column(
-        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat
+        String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
 
-    movies = relationship("Movies", back_populates="user")
+    movies = relationship("Movies", back_populates="user", lazy="selectin")
 
 
 class Movies(Base):
@@ -217,7 +227,7 @@ class Movies(Base):
     status = Column(String, nullable=False, default="Not yet")
 
     user = relationship("User", back_populates="movies")
-    watched_movies = relationship("WatchedMovies", back_populates="who_watched")
+    watched_movies = relationship("WatchedMovies", back_populates="who_watched", lazy="selectin")
 
 
 class WatchedMovies(Base):
@@ -232,7 +242,8 @@ class WatchedMovies(Base):
     __tablename__ = "watched_movies"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("movies.user_id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    movie_id = Column(Integer, ForeignKey("movies.id"))
     title = Column(String, nullable=False)
     status = Column(String, nullable=False, default="Watched")
     watched_at = Column(
@@ -255,72 +266,49 @@ RESERVED_USERNAMES = {"admin", "root", "system", "superuser", "administrator"}
 
 class UserManager:
     """
-    Encapsulates all user-related database operations.
+    Encapsulates all user-related database operations (async).
 
-    Manages its own SQLAlchemy engine and session factory.  Every public
-    method that mutates data is decorated with `@transaction` to guarantee
-    atomic commits or full rollbacks on failure.
+    Manages its own async SQLAlchemy engine and session factory.  Every
+    public method that mutates data is decorated with `@transaction` to
+    guarantee atomic commits or full rollbacks on failure.
 
     Args:
-        db_path: Filesystem path to the SQLite database file.
-        echo:    If True, SQLAlchemy will log all generated SQL.
+        db_url: PostgreSQL async connection URL.
+        echo:   If True, SQLAlchemy will log all generated SQL.
     """
 
-    def __init__(self, db_path: str, echo: bool = False):
-        self.engine = create_engine(f"sqlite:///{db_path}", echo=echo)
-        Base.metadata.create_all(bind=self.engine)
-        self.session = sessionmaker(bind=self.engine)
+    def __init__(self, db_url: str, echo: bool = False):
+        self.engine = create_async_engine(db_url, echo=echo)
+        self.session = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
+
+    async def create_tables(self):
+        """Create all tables in the database (called once at startup)."""
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
     # --- Decorators ---
 
     @staticmethod
-    def catch_error(exceptions: tuple = (Exception,)):
-        """
-        Decorator factory that wraps a method in try/except logging.
-
-        Args:
-            exceptions: Tuple of exception classes to catch and re-raise.
-        """
-
-        def decorator(func):
-            @wraps(func)
-            def wrapper(self, *args, **kwargs):
-                try:
-                    logger.info(f"Running function: {func.__name__}")
-                    result = func(self, *args, **kwargs)
-                    logger.info(f"Done function: {func.__name__}")
-                    return result
-                except exceptions as e:
-                    logger.error(
-                        f"Error in function: {func.__name__} - error: {str(e)}"
-                    )
-                    raise
-
-            return wrapper
-
-        return decorator
-
-    @staticmethod
     def transaction(func):
         """
-        Decorator that wraps a method in a database session context.
+        Decorator that wraps an async method in a database session context.
 
-        Opens a new session, calls the decorated function with the session
-        as its first positional argument (after `self`), commits on success,
-        and rolls back + re-raises on any exception.
+        Opens a new async session, calls the decorated function with the
+        session as its first positional argument (after `self`), commits
+        on success, and rolls back + re-raises on any exception.
         """
 
         @wraps(func)
-        def wrapper(self, *args, **kwargs):
+        async def wrapper(self, *args, **kwargs):
             logger.info(f"Running function: {func.__name__}")
-            with self.session() as session:
+            async with self.session() as session:
                 try:
-                    result = func(self, session, *args, **kwargs)
-                    session.commit()
+                    result = await func(self, session, *args, **kwargs)
+                    await session.commit()
                     logger.info(f"Done function: {func.__name__}")
                     return result
                 except Exception as e:
-                    session.rollback()
+                    await session.rollback()
                     logger.error(f"Error in function: {func.__name__} - {str(e)}")
                     raise
 
@@ -328,21 +316,21 @@ class UserManager:
 
     # --- Queries ---
 
-    def user_exists(self, username: str) -> bool:
+    async def user_exists(self, username: str) -> bool:
         """Check whether a user with the given username exists (non-deleted)."""
-        with self.session() as session:
-            stmd = select(User).where(User.username == username)
-            user = session.execute(stmd).scalar_one_or_none()
+        async with self.session() as session:
+            stmt = select(User).where(User.username == username)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
             return user is not None
 
     @transaction
-    def add_user(self, session, user: UserScheme) -> bool:
+    async def add_user(self, session: AsyncSession, user: UserScheme) -> bool:
         """
         Register a new user.
 
         Collects device and network metadata, hashes the password with
-        bcrypt, and persists the record.  The username 'admin' is
-        automatically assigned the admin role.
+        bcrypt, and persists the record.
 
         Raises:
             UserAlreadyExists: If the username is already taken.
@@ -352,7 +340,7 @@ class UserManager:
             raise ReservedUsernameError(user.username)
 
         hashed = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
-        network_data = fetch_network_info()
+        network_data = await fetch_network_info()
         device_info = collect_device_info()
         created_at = datetime.now(timezone.utc).isoformat()
 
@@ -363,7 +351,7 @@ class UserManager:
         new_user = User(
             username=user.username,
             role=assigned_role,
-            password=hashed,
+            password=hashed.decode("utf-8"),
             email=user.email,
             device=device_info.get("device"),
             device_name=device_info.get("device_name"),
@@ -379,7 +367,7 @@ class UserManager:
             last_seen=created_at,
         )  # type: ignore
 
-        is_user_exists = self.user_exists(new_user.username)  # type: ignore
+        is_user_exists = await self.user_exists(new_user.username)  # type: ignore
         if is_user_exists:
             logger.error(f"User already exists: {new_user.username}")
             raise UserAlreadyExists(new_user.username)  # type: ignore
@@ -388,7 +376,7 @@ class UserManager:
         return True
 
     @transaction
-    def delete_user(self, session, username: str) -> bool:
+    async def delete_user(self, session: AsyncSession, username: str) -> bool:
         """
         Soft-delete a user by setting `is_deleted = True`.
 
@@ -398,7 +386,9 @@ class UserManager:
         Raises:
             UserNotFoundError: If no user with the given username exists.
         """
-        user = session.query(User).filter_by(username=username).first()
+        stmt = select(User).where(User.username == username)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(username)
         if hasattr(user, "is_deleted"):
@@ -407,7 +397,7 @@ class UserManager:
         return True
 
     @transaction
-    def ensure_admin_exists(self, session) -> None:
+    async def ensure_admin_exists(self, session: AsyncSession) -> None:
         """
         Ensures at least one admin exists in the system.
 
@@ -417,7 +407,9 @@ class UserManager:
 
         This is intended to be called at application startup.
         """
-        admin_exists = session.query(User).filter(User.role == "admin").first()
+        stmt = select(User).where(User.role == "admin")
+        result = await session.execute(stmt)
+        admin_exists = result.scalar_one_or_none()
         if admin_exists:
             logger.info("Admin account already exists. Skipping seed.")
             return
@@ -441,11 +433,12 @@ class UserManager:
 
         new_admin = User(
             username=username,
-            password=hashed,
+            password=hashed.decode("utf-8"),
             email=email,
             role="admin",
             is_deleted=False,
             created_at=created_at,
+            last_seen=created_at,
             city="System",
             country="System",
             ip="127.0.0.1",
@@ -454,7 +447,7 @@ class UserManager:
         logger.info(f"Successfully seeded superuser: {username}")
 
     @transaction
-    def get_user_by_username(self, session, username: str) -> dict:
+    async def get_user_by_username(self, session: AsyncSession, username: str) -> dict:
         """
         Retrieve a single user record by username.
 
@@ -464,26 +457,30 @@ class UserManager:
         Raises:
             UserNotFoundError: If no matching user is found.
         """
-        user = session.query(User).filter_by(username=username).first()
+        stmt = select(User).where(User.username == username)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(username)
         return {c.name: getattr(user, c.name) for c in user.__table__.columns}
 
     @transaction
-    def get_user_by_id(self, session, id: int) -> dict:
+    async def get_user_by_id(self, session: AsyncSession, id: int) -> dict:
         """
         Retrieve a single user record by primary key.
 
         Raises:
             UserNotFoundError: If no user with the given ID exists.
         """
-        user = session.query(User).filter_by(id=id).first()
+        stmt = select(User).where(User.id == id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(str(id))
         return {c.name: getattr(user, c.name) for c in user.__table__.columns}
 
     @transaction
-    def get_all_users(self, session, skip: int = 0, limit: int = 10) -> list[dict]:
+    async def get_all_users(self, session: AsyncSession, skip: int = 0, limit: int = 10) -> list[dict]:
         """
         Return a paginated list of all user records.
 
@@ -491,13 +488,15 @@ class UserManager:
             skip:  Number of rows to skip (offset).
             limit: Maximum number of rows to return.
         """
-        users = session.query(User).offset(skip).limit(limit).all()
+        stmt = select(User).offset(skip).limit(limit)
+        result = await session.execute(stmt)
+        users = result.scalars().all()
         return [
             {c.name: getattr(u, c.name) for c in u.__table__.columns} for u in users
         ]
 
     @transaction
-    def update_user_field(self, session, username: str, field: str, value: str) -> bool:
+    async def update_user_field(self, session: AsyncSession, username: str, field: str, value: str) -> bool:
         """
         Update a single field on a user record.
 
@@ -506,61 +505,62 @@ class UserManager:
         Raises:
             UserNotFoundError: If the target user does not exist.
         """
-        user = session.query(User).filter_by(username=username).first()
+        stmt = select(User).where(User.username == username)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(username)
         if field.lower() == "password":
-            hashed = bcrypt.hashpw(field.encode("utf-8"), bcrypt.gensalt())
-            setattr(user, field, hashed)
+            hashed = bcrypt.hashpw(value.encode("utf-8"), bcrypt.gensalt())
+            setattr(user, field, hashed.decode("utf-8"))
             return True
         setattr(user, field, value)
-        session.commit()
         logger.info(f"Updated user: {user.username} - {field}: {value}")
         return True
 
 
 class MovieManager:
     """
-    Encapsulates all movie-related database operations.
+    Encapsulates all movie-related database operations (async).
 
     Handles tracking, deletion, status updates, and genre-based
     recommendation lookups against the TMDB API.
 
     Args:
-        db_path: Filesystem path to the SQLite database file.
-        echo:    If True, SQLAlchemy will log all generated SQL.
+        db_url: PostgreSQL async connection URL.
+        echo:   If True, SQLAlchemy will log all generated SQL.
     """
 
-    def __init__(self, db_path: str, echo: bool = False) -> None:
-        self.engine = create_engine(f"sqlite:///{db_path}", echo=echo)
-        self.session = sessionmaker(bind=self.engine)
+    def __init__(self, db_url: str, echo: bool = False) -> None:
+        self.engine = create_async_engine(db_url, echo=echo)
+        self.session = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
 
     @staticmethod
     def transaction(func):
         """
-        Decorator that wraps a method in a database session context.
+        Decorator that wraps an async method in a database session context.
 
         Identical to UserManager.transaction — duplicated here because
         each manager owns its own engine/session factory.
         """
 
         @wraps(func)
-        def wrapper(self, *args, **kwargs):
+        async def wrapper(self, *args, **kwargs):
             logger.info(f"Running function: {func.__name__}")
-            with self.session() as session:
+            async with self.session() as session:
                 try:
-                    result = func(self, session, *args, **kwargs)
-                    session.commit()
+                    result = await func(self, session, *args, **kwargs)
+                    await session.commit()
                     logger.info(f"Done function: {func.__name__}")
                     return result
                 except Exception as e:
-                    session.rollback()
+                    await session.rollback()
                     logger.error(f"Error in function: {func.__name__} - {str(e)}")
                     raise
 
         return wrapper
 
-    def get_top_genres(self, username: str) -> list:
+    async def get_top_genres(self, username: str) -> list:
         """
         Analyse a user's tracked movies and return the top 5 most
         frequently occurring TMDB genre IDs.
@@ -573,8 +573,10 @@ class MovieManager:
             (most common first).  Empty list if the user has no movies.
         """
         genre_ids = ""
-        with self.session() as session:
-            user = session.query(User).filter_by(username=username).first()
+        async with self.session() as session:
+            stmt = select(User).where(User.username == username)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
             if user and user is not None:
                 for movie in user.movies:
                     genre_ids += "," + movie.genre_ids
@@ -588,8 +590,8 @@ class MovieManager:
         return top_genres
 
     @transaction
-    def get_watched_movies(
-        self, session, username: str, skip: int = 0, limit: int = 10
+    async def get_watched_movies(
+        self, session: AsyncSession, username: str, skip: int = 0, limit: int = 10
     ) -> list[dict]:
         """
         Return a paginated list of movies tracked by the given user.
@@ -602,7 +604,9 @@ class MovieManager:
         Raises:
             UserNotFoundError: If no user with the given username exists.
         """
-        user = session.query(User).filter_by(username=username).first()
+        stmt = select(User).where(User.username == username)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(username)
         # Slice-based pagination on the loaded relationship
@@ -612,7 +616,7 @@ class MovieManager:
         ]
 
     @transaction
-    def delete_movie(self, session, username: str, query: str) -> bool:
+    async def delete_movie(self, session: AsyncSession, username: str, query: str) -> bool:
         """
         Remove a movie from a user's tracked collection.
 
@@ -622,23 +626,28 @@ class MovieManager:
         Raises:
             MovieNotFoundError: If the movie is not in the user's list.
         """
-        user = session.query(User).filter_by(username=username).first()
-        data = fetch_tmdb_data(query)
-        is_exist = (
-            session.query(Movies)
-            .filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id"))
-            .first()
+        stmt = select(User).where(User.username == username)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise UserNotFoundError(username)
+            
+        data = await fetch_tmdb_data(query)
+        is_exist_stmt = select(Movies).where(
+            Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
         )
+        is_exist_result = await session.execute(is_exist_stmt)
+        is_exist = is_exist_result.scalar_one_or_none()
         if not is_exist:
             raise MovieNotFoundError(data.get("title"))  # type:ignore
         if user and user is not None:
-            session.delete(is_exist)
+            await session.delete(is_exist)
             logger.info(f"Deleted movie: {data.get('title')} - {user.username}")
             return True
         return False
 
     @transaction
-    def update_status(self, session, username: str, status: str, query: str) -> bool:
+    async def update_status(self, session: AsyncSession, username: str, status: str, query: str) -> bool:
         """
         Mark a tracked movie with a new status (e.g. 'Watched').
 
@@ -648,18 +657,24 @@ class MovieManager:
             MovieAlreadyExists: If the movie already has this status.
             UserNotFoundError:  If the user does not exist.
         """
-        user = session.query(User).filter_by(username=username).first()
-        data = fetch_tmdb_data(query)
-        is_exists = (
-            session.query(Movies)
-            .filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id"))
-            .first()
+        stmt = select(User).where(User.username == username)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise UserNotFoundError(username)
+
+        data = await fetch_tmdb_data(query)
+        is_exists_stmt = select(Movies).where(
+            Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
         )
+        is_exists_result = await session.execute(is_exists_stmt)
+        is_exists = is_exists_result.scalar_one_or_none()
         if is_exists:
             raise MovieAlreadyExists(data.get("title"))  # type: ignore
         if user and user is not None:
             movie = WatchedMovies(
                 user_id=user.id,
+                movie_id=is_exists.id,
                 title=data.get("title"),
                 status=status,
                 watched_at=datetime.now(timezone.utc).isoformat(),
@@ -669,7 +684,7 @@ class MovieManager:
         raise UserNotFoundError(username)
 
     @transaction
-    def add_movie(self, session, username: str, query: str) -> bool:
+    async def add_movie(self, session: AsyncSession, username: str, query: str) -> bool:
         """
         Search TMDB for a movie and add it to the user's tracked list.
 
@@ -680,13 +695,18 @@ class MovieManager:
             MovieAlreadyExists: If the movie is already tracked.
             UserNotFoundError:  If the user does not exist.
         """
-        user = session.query(User).filter_by(username=username).first()
-        data = fetch_tmdb_data(query)
-        is_exist = (
-            session.query(Movies)
-            .filter_by(user_id=user.id, tmdb_id=data.get("tmdb_id"))
-            .first()
+        stmt = select(User).where(User.username == username)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if not user:
+            raise UserNotFoundError(username)
+
+        data = await fetch_tmdb_data(query)
+        is_exist_stmt = select(Movies).where(
+            Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
         )
+        is_exist_result = await session.execute(is_exist_stmt)
+        is_exist = is_exist_result.scalar_one_or_none()
         if is_exist:
             raise MovieAlreadyExists(data.get("title"))  # type:ignore
         if user and user is not None:

@@ -1,81 +1,50 @@
-# --- Python bytecode & caches ---
-
-**pycache**/
+# --- Python ---
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
-
-# --- Testing ---
-.pytest_cache/
-.ruff_cache/
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.nox/
-
-# --- Virtual environments ---
-.venv/
-venv/
-ENV/
+.Python
 env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
 
-# --- Secrets (NEVER commit these) ---
+# --- Databases ---
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+
+# --- Environment & Secrets ---
 .env
-.env.*
-!.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.flaskenv
 
-# --- Database files (regenerated at runtime) ---
-*.db
-*.sqlite3
-database/
+# --- Docker ---
+.dockeride*
 
-# --- IDE / OS specific ---
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- IDEs ---
 .vscode/
-.antigravity/
 .idea/
 *.swp
 *.swo
-.DS_Store
-Thumbs.db
-Desktop.ini
-
-# --- Logs ---
-*.log
-logs/
-pip-log.txt
-pip-delete-this-directory.txt
-
-# --- ML model weights (if any) ---
-*.pt
-*.pth
-*.ckpt
-
-# --- ML data / experiment outputs ---
-data/
-datasets/
-outputs/
-runs/
-wandb/
-mlruns/
-
-# --- Jupyter ---
-.ipynb_checkpoints
-
-# --- Build / distribution ---
-build/
-dist/
-*.egg-info/
-.eggs/
-
-# --- Caches ---
-.cache/
-*.cache
-
-# --- Docker ---
-docker-compose.override.yml
-
-# --- Misc ---
-*.bak
-*.tmp
-*.temp

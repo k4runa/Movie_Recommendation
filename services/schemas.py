@@ -37,8 +37,8 @@ class UserScheme(BaseModel):
     @field_validator("username")
     @classmethod
     def is_valid_username(cls, v):
-        if len(v) < 5:
-            raise ValueError("Username must be longer than 5 characters.")
+        if len(v) < 4:
+            raise ValueError("Username must be longer than 4 characters.")
         forbidden = set("@-.!'?*)(/{}%+^&")
         if forbidden & set(v):
             raise ValueError("Username shouldn't have any special characters.")

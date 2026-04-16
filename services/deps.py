@@ -4,9 +4,8 @@ services/deps.py — Dependency Injection (Singleton Managers)
 Creates singleton instances of UserManager and MovieManager that are
 shared across all request handlers via Python module-level imports.
 
-The database path is read from the DB_PATH environment variable.
-If the parent directory does not exist, it is created automatically
-so the SQLite file can be initialized on first run.
+The database URL is read from the DATABASE_URL environment variable,
+which should be a PostgreSQL asyncpg connection string.
 
 Usage in routers:
     from services.deps import users_manager, movies_manager
@@ -21,23 +20,21 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# Database Path Resolution
+# Database URL Resolution
 # ---------------------------------------------------------------------------
-DB_PATH = os.getenv("DB_PATH", "database/database.db")
-if not DB_PATH:
-    logger.error("FATAL: DB_PATH not found.")
-    raise ValueError("FATAL: DB_PATH not found. Please set in .env")
-
-# Ensure the directory tree exists before SQLAlchemy tries to create the file
-dir_path = os.path.dirname(DB_PATH)
-if dir_path:
-    os.makedirs(dir_path, exist_ok=True)
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://cinewave:cinewave_secret@localhost:5432/cinewave_db",
+)
+if not DATABASE_URL:
+    logger.error("FATAL: DATABASE_URL not found.")
+    raise ValueError("FATAL: DATABASE_URL not found. Please set in .env")
 
 # ---------------------------------------------------------------------------
 # Singleton Manager Instances
 # ---------------------------------------------------------------------------
 # These are instantiated once at import time and reused for the lifetime
-# of the process.  Each manager creates its own engine and session factory.
+# of the process.  Each manager creates its own async engine and session factory.
 # ---------------------------------------------------------------------------
-users_manager = UserManager(db_path=DB_PATH, echo=False)  # type:ignore
-movies_manager = MovieManager(db_path=DB_PATH, echo=False)  # type:ignore
+users_manager = UserManager(db_url=DATABASE_URL, echo=False)
+movies_manager = MovieManager(db_url=DATABASE_URL, echo=False)

@@ -17,7 +17,7 @@ router = APIRouter(tags=["auth"])
 
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """
     Authenticate a user and return a JWT access token.
 
@@ -30,11 +30,11 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
                            vague to prevent user enumeration.
     """
     try:
-        user_in_db = users_manager.get_user_by_username(form_data.username)  # type: ignore
+        user_in_db = await users_manager.get_user_by_username(form_data.username)  # type: ignore
     except UserNotFoundError:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
 
-    if not verify_password(form_data.password, user_in_db.get("password", "")):
+    if not await verify_password(form_data.password, user_in_db.get("password", "")):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
 
     access_token = create_access_token(data={"sub": user_in_db["username"]})

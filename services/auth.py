@@ -22,6 +22,7 @@ import logging
 import jwt
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status, Depends
+from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 
@@ -45,23 +46,18 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 # ---------------------------------------------------------------------------
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Compare a plaintext password against a bcrypt hash.
-
-    Handles the str → bytes conversion internally so callers don't
-    have to worry about encoding.
-
-    Returns:
-        True if the password matches, False otherwise.
+    Compare a plaintext password against a bcrypt hash asynchronously.
     """
     try:
         if isinstance(plain_password, str):
-            plain_password = plain_password.encode("utf-8")  # type: ignore
+            plain_password = plain_password.encode("utf-8")
         if isinstance(hashed_password, str):
-            hashed_password = hashed_password.encode("utf-8")  # type: ignore
+            hashed_password = hashed_password.encode("utf-8")
 
-        return bcrypt.checkpw(plain_password, hashed_password)  # type: ignore
+        # Run the blocking bcrypt call in a thread pool
+        return await run_in_threadpool(bcrypt.checkpw, plain_password, hashed_password)
     except Exception as e:
         logger.error(f"Error checking password: {e}")
         return False
