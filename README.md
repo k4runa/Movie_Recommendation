@@ -1,4 +1,4 @@
-# 🎬 CineWave: Movie Recommendation API (Async + PostgreSQL)
+# 🎬 CineWave: Movie Recommendation APP
 
 CineWave is a high-performance, asynchronous RESTful API built with FastAPI. It allows users to track their personal movie collections and receive AI-powered recommendations based on their watching history.
 
