@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from services.database import logger
 from services.deps import users_manager
 from services.schemas import UserScheme, APIResponseUser, APIResponseUsersList
-from services.auth import get_current_user
+from services.auth import get_current_user, create_access_token
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -34,6 +34,7 @@ class UpdateUserRequest(BaseModel):
 
     field: str
     value: str
+    current_password: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -74,14 +75,22 @@ async def get_all_users(
 
 
 @router.get("/id/{id}", response_model=APIResponseUser)
-async def get_user_by_id(id: int):
-    """Retrieve a user record by its numeric primary key."""
+async def get_user_by_id(id: int, current_user: dict = Depends(get_current_user)):
+    """
+    Retrieve a user record by its numeric primary key (admin-only).
+    """
+    user_in_db = await users_manager.get_user_by_username(current_user["username"])  # type: ignore
+    if user_in_db.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
     user = await users_manager.get_user_by_id(id)  # type: ignore
     return {"success": True, "data": {"user": user}}
 
 
 @router.get("/{username}", response_model=APIResponseUser)
-async def get_user_by_username(username: str, current_user: dict = Depends(get_current_user)):
+async def get_user_by_username(
+    username: str, current_user: dict = Depends(get_current_user)
+):
     """
     Retrieve the authenticated user's own profile.
 
@@ -124,5 +133,19 @@ async def update_user_field(
         raise HTTPException(
             status_code=403, detail="Not authorized to access this resource"
         )
-    success = await users_manager.update_user_field(username, v.field, v.value)  # type: ignore
-    return {"success": success}
+    try:
+        success = await users_manager.update_user_field(
+            username, v.field, v.value, v.current_password
+        )  # type: ignore
+        
+        response = {"success": success}
+        
+        # If username changed, we must issue a new token
+        if v.field.lower() == "username" and success:
+            new_token = create_access_token(data={"sub": v.value})
+            response["new_token"] = new_token
+            response["new_username"] = v.value
+            
+        return response
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

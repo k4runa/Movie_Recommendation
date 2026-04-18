@@ -22,8 +22,20 @@
  *   5. API Helpers
  *   6. Data Fetching (Watched, Recommendations)
  *   7. Movie Actions (Track, Delete)
+ *   7. Movie Actions (Track, Delete)
  *   8. Admin Panel (User List, Ban)
  */
+
+/** Simple HTML escaping to prevent XSS when using .innerHTML */
+const esc = (str) => {
+    if (!str) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+};
 
 const API_BASE = ''; // Same origin — no CORS needed
 
@@ -46,7 +58,8 @@ let isLoginMode = true;
 let dataLoaded = {
     watched: false,
     recs: false,
-    admin: false
+    admin: false,
+    settings: false
 };
 
 /**
@@ -58,6 +71,7 @@ const el = {
     navActions: document.getElementById('nav-actions'),
     userGreeting: document.getElementById('user-greeting'),
     btnLogout: document.getElementById('btn-logout'),
+    btnRefresh: document.getElementById('btn-refresh'),
     
     // View containers
     viewAuth: document.getElementById('view-auth'),
@@ -97,7 +111,30 @@ const el = {
     adminUsersTbody: document.getElementById('admin-users-tbody'),
 
     // AI Components
-    aiInsightsContainer: document.getElementById('ai-insights-container')
+    aiInsightsContainer: document.getElementById('ai-insights-container'),
+    
+    // Settings tab
+    aiToggle: document.getElementById('ai-toggle'),
+    formUpdateEmail: document.getElementById('form-update-email'),
+    inputNewEmail: document.getElementById('input-new-email'),
+    inputEmailVerifyPassword: document.getElementById('input-email-verify-password'),
+    formUpdatePassword: document.getElementById('form-update-password'),
+    inputPassCurrent: document.getElementById('input-pass-current'),
+    inputNewPassword: document.getElementById('input-new-password'),
+    inputNewPasswordConfirm: document.getElementById('input-new-password-confirm'),
+    settingsMsg: document.getElementById('settings-msg'),
+    
+    // Settings Views
+    btnGotoEmail: document.getElementById('btn-goto-email'),
+    btnGotoPassword: document.getElementById('btn-goto-password'),
+    settingsViews: document.querySelectorAll('.settings-view'),
+    msgEmail: document.getElementById('msg-email'),
+    msgPassword: document.getElementById('msg-password'),
+    msgUsername: document.getElementById('msg-username'),
+    inputMaxToasts: document.getElementById('input-max-toasts'),
+    formUpdateUsername: document.getElementById('form-update-username'),
+    inputNewUsername: document.getElementById('input-new-username'),
+    inputUsernameVerifyPassword: document.getElementById('input-username-verify-password'),
 };
 
 
@@ -132,6 +169,164 @@ function attachListeners() {
     });
     
     el.addMovieForm.addEventListener('submit', handleAddMovie);
+    
+    if(el.aiToggle) {
+        el.aiToggle.addEventListener('change', handleToggleAI);
+    }
+    
+    if(el.btnRefresh) {
+        el.btnRefresh.addEventListener('click', handleRefresh);
+    }
+
+    if(el.formUpdateEmail) {
+        el.formUpdateEmail.addEventListener('submit', handleUpdateEmail);
+    }
+
+    if(el.formUpdatePassword) {
+        el.formUpdatePassword.addEventListener('submit', handleUpdatePassword);
+    }
+    if(el.formUpdateUsername) {
+        el.formUpdateUsername.addEventListener('submit', handleUpdateUsername);
+    }
+    if(el.inputMaxToasts) {
+        el.inputMaxToasts.addEventListener('change', handleUpdateMaxToasts);
+    }
+
+    if(el.btnGotoEmail) el.btnGotoEmail.addEventListener('click', () => showSettingsView('settings-email'));
+    if(el.btnGotoPassword) el.btnGotoPassword.addEventListener('click', () => showSettingsView('settings-password'));
+}
+
+// 2.5 TOAST, CONFIRM & SETTINGS NAVIGATION LOGIC
+window.showSettingsView = function(viewId) {
+    el.settingsViews.forEach(v => v.classList.add('hidden'));
+    const target = document.getElementById(viewId);
+    if (target) target.classList.remove('hidden');
+};
+
+window.openSettingsModal = function(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    
+    // Clear any previous messages
+    if (el.msgEmail) { el.msgEmail.classList.add('hidden'); el.msgEmail.textContent = ''; }
+    if (el.msgPassword) { el.msgPassword.classList.add('hidden'); el.msgPassword.textContent = ''; }
+    if (el.msgUsername) { el.msgUsername.classList.add('hidden'); el.msgUsername.textContent = ''; }
+    
+    modal.classList.remove('hidden');
+    const box = modal.querySelector('.modal-box');
+    setTimeout(() => {
+        modal.classList.add('show');
+        if (box) box.classList.add('show');
+    }, 10);
+};
+
+window.showMessage = function(element, text, type = 'error') {
+    if (!element) return;
+    element.textContent = text;
+    element.className = `msgbox ${type}`;
+    element.classList.remove('hidden');
+};
+
+window.closeSettingsModal = function(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.classList.remove('show');
+    const box = modal.querySelector('.modal-box');
+    if (box) box.classList.remove('show');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+};
+
+window.showToast = function(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    // Apply max toasts limit
+    const maxToasts = parseInt(localStorage.getItem('max_toasts')) || 5;
+    while (container.children.length >= maxToasts) {
+        container.removeChild(container.firstChild);
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    let icon = 'info';
+    if (type === 'success') icon = 'check-circle';
+    if (type === 'error') icon = 'warning-circle';
+    
+    toast.innerHTML = `<i class="ph ph-${icon}" style="font-size: 1.25rem;"></i> <span>${esc(message)}</span>`;
+    container.appendChild(toast);
+    
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 400);
+    }, 3000);
+};
+
+window.showConfirm = function(message) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal-box';
+        
+        modal.innerHTML = `
+            <div class="modal-icon"><i class="ph ph-warning-circle"></i></div>
+            <p class="modal-msg">${esc(message)}</p>
+            <div class="modal-actions">
+                <button class="btn btn-outline" id="btn-cancel">Cancel</button>
+                <button class="btn btn-danger" id="btn-confirm">Remove</button>
+            </div>
+        `;
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        // Trigger entrance animation
+        setTimeout(() => {
+            overlay.classList.add('show');
+            modal.classList.add('show');
+        }, 10);
+        
+        const closeModal = () => {
+            overlay.classList.remove('show');
+            modal.classList.remove('show');
+            setTimeout(() => overlay.remove(), 300);
+        };
+        
+        modal.querySelector('#btn-cancel').addEventListener('click', () => {
+            closeModal();
+            resolve(false);
+        });
+        
+        modal.querySelector('#btn-confirm').addEventListener('click', () => {
+            closeModal();
+            resolve(true);
+        });
+    });
+};
+
+async function handleRefresh() {
+    const icon = el.btnRefresh.querySelector('i');
+    if(icon) icon.classList.add('spin');
+    
+    // Invalidate caches
+    dataLoaded.watched = false;
+    dataLoaded.recs = false;
+    dataLoaded.admin = false;
+    
+    const activeTabBtn = document.querySelector('.dock-item.active');
+    if (activeTabBtn) {
+        const targetId = activeTabBtn.dataset.target;
+        if (targetId === 'tab-watched') await loadWatchedMovies();
+        if (targetId === 'tab-recommend') await loadRecommendations();
+        if (targetId === 'tab-admin') await loadAdminUsers();
+        if (targetId === 'tab-settings') await loadUserSettings();
+    }
+    
+    if(icon) icon.classList.remove('spin');
+    showToast("Data refreshed successfully", "success");
 }
 
 
@@ -211,6 +406,7 @@ function switchTab(targetId) {
     if (targetId === 'tab-watched' && !dataLoaded.watched) loadWatchedMovies();
     if (targetId === 'tab-recommend' && !dataLoaded.recs) loadRecommendations();
     if (targetId === 'tab-admin' && !dataLoaded.admin) loadAdminUsers();
+    if (targetId === 'tab-settings' && !dataLoaded.settings) loadUserSettings();
 }
 
 
@@ -290,6 +486,7 @@ function saveSession(token, username) {
 function logout() {
     localStorage.removeItem('access_token');
     localStorage.removeItem('username');
+    localStorage.removeItem('max_toasts');
     currentToken = null;
     currentUsername = null;
     el.authForm.reset();
@@ -330,7 +527,7 @@ async function loadWatchedMovies() {
     el.loadingWatched.classList.remove('hidden');
     
     try {
-        const res = await fetchWithAuth(`/movies/${currentUsername}/watched`);
+        const res = await fetchWithAuth(`/movies/${currentUsername}/watched?limit=100`);
         const result = await res.json();
         
         // Clear grid only after data arrives (prevents white flash)
@@ -346,13 +543,13 @@ async function loadWatchedMovies() {
                 const card = document.createElement('div');
                 card.className = 'movie-card';
                 card.innerHTML = `
-                    <h4>${m.title}</h4>
+                    <h4>${esc(m.title)}</h4>
                     <div class="meta">
-                        <span>TMDB #${m.tmdb_id || '?'}</span>
+                        <span>TMDB #${esc(m.tmdb_id || '?')}</span>
                         <span class="muted">Added ${dateRaw}</span>
                     </div>
-                    <p class="desc-line">${m.overview || 'No description available for this title.'}</p>
-                    <button class="btn-delete" onclick="deleteMovie('${m.title.replace(/'/g, "\\'")}')"  >Remove</button>
+                    <p class="desc-line">${esc(m.overview || 'No description available for this title.')}</p>
+                    <button class="btn-delete" onclick="deleteMovie(${m.id}, '${esc(m.title)}')">Remove</button>
                 `;
                 el.watchedGrid.appendChild(card);
             });
@@ -388,7 +585,7 @@ async function loadRecommendations() {
 
         // Render AI Insights Profile
         if (insightsResult.success && insightsResult.data.insight) {
-            el.aiInsightsContainer.innerHTML = `<strong>AI Movie Personality:</strong> ${insightsResult.data.insight}`;
+            el.aiInsightsContainer.innerHTML = `<strong>AI Movie Personality:</strong> ${esc(insightsResult.data.insight)}`;
             el.aiInsightsContainer.classList.remove('hidden');
         }
 
@@ -400,17 +597,17 @@ async function loadRecommendations() {
                 card.className = 'movie-card';
                 
                 const aiReasonHtml = m.ai_reason 
-                    ? `<div class="ai-reason">✨ <strong>AI Insight:</strong> ${m.ai_reason}</div>` 
+                    ? `<div class="ai-reason">✨ <strong>AI Insight:</strong> ${esc(m.ai_reason)}</div>` 
                     : '';
 
                 card.innerHTML = `
-                    <h4>${m.title}</h4>
+                    <h4>${esc(m.title)}</h4>
                     <div class="meta">
-                        <span>Rating: ${m.vote_average || 'N/A'}</span>
+                        <span>Rating: ${esc(m.vote_average) || 'N/A'}</span>
                     </div>
-                    <p class="desc-line">${m.overview || 'No description available for this title.'}</p>
+                    <p class="desc-line">${esc(m.overview) || 'No description available for this title.'}</p>
                     ${aiReasonHtml}
-                    <button class="btn btn-outline w-100 rec-btn" onclick="quickTrack(this, '${m.title.replace(/'/g, "\\'") }')">+ Track Now</button>
+                    <button class="btn btn-outline w-100 rec-btn" onclick="quickTrack(this, '${esc(m.title)}')">+ Track Now</button>
                 `;
                 el.recsGrid.appendChild(card);
             });
@@ -432,9 +629,7 @@ async function loadRecommendations() {
  * @param {string} query — Movie title to search on TMDB.
  */
 async function performMovieTracking(query) {
-    el.addMsg.classList.remove('hidden');
-    el.addMsg.className = 'msgbox';
-    el.addMsg.innerHTML = "Searching and applying...";
+    showToast("Searching and applying...", "info");
     
     try {
         const res = await fetchWithAuth(`/movies/${currentUsername}`, {
@@ -446,7 +641,6 @@ async function performMovieTracking(query) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || "Failed to add movie");
         
-        el.addMsg.innerHTML = `<span class="success-msg">Movie tracked successfully!</span>`;
         el.movieQuery.value = '';
         
         // Invalidate both caches so fresh data is fetched on next visit
@@ -456,8 +650,9 @@ async function performMovieTracking(query) {
         // Navigate to My Movies and force a refresh
         switchTab('tab-watched');
         loadWatchedMovies();
+        showToast("Movie tracked successfully!", "success");
     } catch (err) {
-        el.addMsg.innerHTML = `<span class="error-msg">${err.message}</span>`;
+        showToast(err.message, "error");
     }
 }
 
@@ -474,34 +669,55 @@ async function handleAddMovie(e) {
 
 /**
  * Quick-track a movie directly from the Recommendations tab.
- * Shows a brief "Submitting..." state on the button before processing.
+ * Makes the API call inline and updates the button state on success.
  *
  * @param {HTMLElement} btnElement — The clicked button (for visual feedback).
  * @param {string}      title     — Movie title to track.
  */
-window.quickTrack = function(btnElement, title) {
-    el.movieQuery.value = title;
+window.quickTrack = async function(btnElement, title) {
     btnElement.innerText = "Submitting...";
     btnElement.classList.add('btn-processing');
     
-    // Small delay for visual feedback before navigating away
-    setTimeout(() => {
-        switchTab('tab-add');
-        performMovieTracking(title);
-    }, 200);
+    try {
+        const res = await fetchWithAuth(`/movies/${currentUsername}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: title })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed to add movie");
+        
+        // Success feedback directly on the button
+        btnElement.innerText = "✓ Tracked";
+        btnElement.style.backgroundColor = "rgba(46, 204, 113, 0.2)";
+        btnElement.style.borderColor = "rgba(46, 204, 113, 0.5)";
+        btnElement.style.color = "#2ecc71";
+        
+        // Invalidate watched cache so it refreshes next time the user visits it
+        dataLoaded.watched = false;
+        showToast("Movie tracked successfully!", "success");
+        
+    } catch (err) {
+        btnElement.innerText = "Error (Try Again)";
+        btnElement.classList.remove('btn-processing');
+        showToast("Failed to track movie: " + err.message, "error");
+    }
 }
 
 /**
  * Remove a tracked movie after user confirmation.
  * Invalidates caches and refreshes the My Movies grid.
  *
- * @param {string} title — Title of the movie to delete.
+ * @param {number} movieId — Database primary key of the movie to delete.
+ * @param {string} title — Title of the movie (for display in confirmation/toast).
  */
-window.deleteMovie = async function(title) {
-    if (!confirm(`Are you sure you want to remove '${title}'?`)) return;
+window.deleteMovie = async function(movieId, title) {
+    const confirmed = await showConfirm(`Are you sure you want to remove '${title}'?`);
+    if (!confirmed) return;
     
     try {
-        const res = await fetchWithAuth(`/movies/${currentUsername}/${encodeURIComponent(title)}`, {
+        const res = await fetchWithAuth(`/movies/${currentUsername}/${movieId}`, {
             method: 'DELETE'
         });
         const data = await res.json();
@@ -512,8 +728,9 @@ window.deleteMovie = async function(title) {
         dataLoaded.recs = false;
         
         loadWatchedMovies();
+        showToast(`'${title}' removed successfully.`, "success");
     } catch (err) {
-        alert("Failed to delete: " + err.message);
+        showToast("Failed to delete: " + err.message, "error");
     }
 }
 
@@ -537,18 +754,18 @@ async function loadAdminUsers() {
             const tr = document.createElement('tr');
             const date = new Date(u.created_at || new Date()).toLocaleDateString();
             tr.innerHTML = `
-                <td>#${u.id}</td>
+                <td>#${esc(u.id.toString())}</td>
                 <td>
-                    <strong>${u.username}</strong><br>
-                    <span style="color:var(--text-muted); font-size:0.8rem;">${u.email}</span>
+                    <strong>${esc(u.username)}</strong><br>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">${esc(u.email)}</span>
                 </td>
                 <td>
-                    <span class="badge">${u.os}</span><br>
-                    <span style="color:var(--text-muted); font-size:0.8rem;">${u.city}, ${u.country}</span>
+                    <span class="badge">${esc(u.os || 'N/A')}</span><br>
+                    <span style="color:var(--text-muted); font-size:0.8rem;">${esc(u.city || 'Unknown')}, ${esc(u.country || 'Unknown')}</span>
                 </td>
-                <td>${date}</td>
+                <td>${esc(date)}</td>
                 <td>
-                    <button class="btn-delete" style="width:auto; padding:0.3rem 0.6rem;" onclick="adminDeleteUser('${u.username}')">Ban</button>
+                    <button class="btn-delete" style="width:auto; padding:0.3rem 0.6rem;" onclick="adminDeleteUser('${esc(u.username)}')">Ban</button>
                 </td>
             `;
             el.adminUsersTbody.appendChild(tr);
@@ -567,8 +784,13 @@ async function loadAdminUsers() {
  * @param {string} username — Username of the account to ban.
  */
 window.adminDeleteUser = async function(username) {
-    if (username === 'admin') { alert("Cannot delete admin."); return; }
-    if (!confirm(`Are you absolutely sure you want to permanently delete user ${username}?`)) return;
+    if (username === 'admin') { 
+        showToast("Cannot delete admin.", "error"); 
+        return; 
+    }
+    
+    const confirmed = await showConfirm(`Are you absolutely sure you want to permanently delete user ${username}?`);
+    if (!confirmed) return;
     
     try {
         const res = await fetchWithAuth(`/users/${username}`, {
@@ -579,11 +801,249 @@ window.adminDeleteUser = async function(username) {
         
         // Refresh the admin table
         loadAdminUsers();
+        showToast(`User ${username} banned.`, "success");
     } catch (err) {
-        alert("Failed to delete user: " + err.message);
+        showToast("Failed to delete user: " + err.message, "error");
     }
+}
+
+
+// 9. SETTINGS & PROFILE
+
+/**
+ * Fetch the user's profile to populate the settings tab.
+ */
+async function loadUserSettings() {
+    try {
+        const res = await fetchWithAuth(`/users/${currentUsername}`);
+        const result = await res.json();
+        
+        if (!res.ok) throw new Error(result.detail || "Failed to load settings");
+        
+        const data = result.data.user;
+        el.aiToggle.checked = data.ai_enabled;
+        
+        // Only the 'admin' user sees the admin panel tab
+        if (data.role === 'admin') {
+            el.btnAdminTab.classList.remove('hidden');
+        }
+        
+        // Update local settings state
+        if (data.max_toasts) {
+            localStorage.setItem('max_toasts', data.max_toasts);
+            if (el.inputMaxToasts) el.inputMaxToasts.value = data.max_toasts;
+        }
+
+        dataLoaded.settings = true;
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+/**
+ * Handle toggling the AI feature and updating the backend.
+ */
+async function handleToggleAI(e) {
+    const isEnabled = e.target.checked;
+    el.aiToggle.disabled = true;
+    
+    try {
+        const res = await fetchWithAuth(`/users/${currentUsername}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ field: 'ai_enabled', value: isEnabled.toString() })
+        });
+        
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || "Failed to update setting");
+        
+        dataLoaded.recs = false;
+        showToast("Settings updated successfully.", "success");
+    } catch (err) {
+        el.aiToggle.checked = !isEnabled;
+        showToast(err.message, "error");
+    } finally {
+        el.aiToggle.disabled = false;
+    }
+}
+
+async function handleUpdateEmail(e) {
+    e.preventDefault();
+    const newEmail = el.inputNewEmail.value;
+    const currentPass = el.inputEmailVerifyPassword.value;
+    
+    // Hide previous messages
+    el.msgEmail.classList.add('hidden');
+
+    try {
+        const res = await fetchWithAuth(`/users/${currentUsername}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                field: 'email', 
+                value: newEmail,
+                current_password: currentPass
+            })
+        });
+        
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || "Failed to update email");
+        
+        el.inputNewEmail.value = '';
+        el.inputEmailVerifyPassword.value = '';
+        showToast("Email updated successfully.", "success");
+        closeSettingsModal('modal-update-email');
+    } catch (err) {
+        showMessage(el.msgEmail, err.message, "error");
+    }
+}
+
+async function handleUpdatePassword(e) {
+    e.preventDefault();
+    const currentPass = el.inputPassCurrent.value;
+    const newPassword = el.inputNewPassword.value;
+    const confirmPassword = el.inputNewPasswordConfirm.value;
+
+    // Hide previous messages
+    el.msgPassword.classList.add('hidden');
+
+    if (newPassword !== confirmPassword) {
+        showMessage(el.msgPassword, "New passwords do not match.", "error");
+        return;
+    }
+
+    if (newPassword === currentPass) {
+        showMessage(el.msgPassword, "New password must be different from the current one.", "error");
+        return;
+    }
+    
+    try {
+        const res = await fetchWithAuth(`/users/${currentUsername}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                field: 'password', 
+                value: newPassword,
+                current_password: currentPass
+            })
+        });
+        
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || "Failed to update password");
+        
+        el.inputPassCurrent.value = '';
+        el.inputNewPassword.value = '';
+        el.inputNewPasswordConfirm.value = '';
+        showToast("Password updated successfully.", "success");
+        closeSettingsModal('modal-update-password');
+    } catch (err) {
+        showMessage(el.msgPassword, err.message, "error");
+    }
+}
+
+
+// 10. THREE.JS BACKGROUND (Dotted Surface)
+
+function initThreeJSBackground() {
+    const container = document.getElementById('canvas-container');
+    if (!container || typeof THREE === 'undefined') return;
+
+    const SEPARATION = 150;
+    const AMOUNTX = 40;
+    const AMOUNTY = 60;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x0a0a0a, 2000, 10000); // Matches var(--bg-dark)
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.set(0, 355, 1220);
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(scene.fog.color, 0);
+
+    container.appendChild(renderer.domElement);
+
+    const positions = [];
+    const colors = [];
+    const geometry = new THREE.BufferGeometry();
+
+    for (let ix = 0; ix < AMOUNTX; ix++) {
+        for (let iy = 0; iy < AMOUNTY; iy++) {
+            const x = ix * SEPARATION - (AMOUNTX * SEPARATION) / 2;
+            const y = 0;
+            const z = iy * SEPARATION - (AMOUNTY * SEPARATION) / 2;
+
+            positions.push(x, y, z);
+            // Pure neutral gray particles for dark theme
+            colors.push(0.35, 0.35, 0.35);
+        }
+    }
+
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+        size: 8,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.6,
+        sizeAttenuation: true,
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    let count = 0;
+    let mouseX = 0;
+    let mouseY = 0;
+    let windowHalfX = window.innerWidth / 2;
+    let windowHalfY = window.innerHeight / 2;
+
+    document.addEventListener('mousemove', (event) => {
+        mouseX = event.clientX - windowHalfX;
+        mouseY = event.clientY - windowHalfY;
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const positionAttribute = geometry.attributes.position;
+        const posArray = positionAttribute.array;
+
+        let i = 0;
+        for (let ix = 0; ix < AMOUNTX; ix++) {
+            for (let iy = 0; iy < AMOUNTY; iy++) {
+                const index = i * 3;
+                posArray[index + 1] = Math.sin((ix + count) * 0.3) * 50 + Math.sin((iy + count) * 0.5) * 50;
+                i++;
+            }
+        }
+
+        positionAttribute.needsUpdate = true;
+
+        // Interactive Parallax Effect
+        camera.position.x += (mouseX * 0.8 - camera.position.x) * 0.05;
+        camera.position.y += (-mouseY * 0.5 + 355 - camera.position.y) * 0.05;
+        camera.lookAt(scene.position);
+
+        renderer.render(scene, camera);
+        count += 0.1;
+    }
+
+    window.addEventListener('resize', () => {
+        windowHalfX = window.innerWidth / 2;
+        windowHalfY = window.innerHeight / 2;
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
 }
 
 
 // BOOTSTRAP
 init();
+initThreeJSBackground();

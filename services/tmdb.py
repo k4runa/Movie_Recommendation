@@ -32,11 +32,17 @@ async def fetch_tmdb_data(query: str) -> dict[str, Any]:
         Empty dict if no results are found.
     """
     api_key = os.getenv("API_KEY")
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"https://api.themoviedb.org/3/search/movie?query={query}&api_key={api_key}"
-        )
-        data_response: dict = response.json()
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.get(
+                f"https://api.themoviedb.org/3/search/movie?query={query}&api_key={api_key}"
+            )
+            response.raise_for_status()
+            data_response: dict = response.json()
+    except (httpx.RequestError, httpx.HTTPStatusError, ValueError) as e:
+        print(f"TMDB search failed: {e}")
+        return {}
+        
     data = data_response.get("results", [])
     if not data:
         return {}
@@ -73,11 +79,17 @@ async def fetch_recommendations(genre_ids: list[int], limit: int = 5) -> list[di
         raise ValueError("Limit should be less than 20")
     api_key = os.getenv("API_KEY")
     genre_str = ",".join(str(i) for i in genre_ids)
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            f"https://api.themoviedb.org/3/discover/movie?with_genres={genre_str}&api_key={api_key}"
-        )
-        response_data = response.json()
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.get(
+                f"https://api.themoviedb.org/3/discover/movie?with_genres={genre_str}&api_key={api_key}"
+            )
+            response.raise_for_status()
+            response_data = response.json()
+    except (httpx.RequestError, httpx.HTTPStatusError, ValueError) as e:
+        print(f"TMDB discover failed: {e}")
+        return []
+        
     return [
         {
             "tmdb_id": m["id"],

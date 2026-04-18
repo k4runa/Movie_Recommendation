@@ -8,11 +8,20 @@
     <!-- Google Fonts — Outfit for a clean, modern feel -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/ui/css/style.css">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Three.js for Background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
     <!-- Background orbs (disabled via CSS, kept for potential future use) -->
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
+    
+    <!-- Three.js Dotted Surface Container -->
+    <div id="canvas-container" class="pointer-events-none fixed inset-0 -z-1" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none;"></div>
     
     <div class="glass-container">
         
@@ -21,7 +30,10 @@
             <div class="logo">
                 <span class="gradient-text">CineWave</span> API
             </div>
-            <div id="nav-actions" class="nav-actions hidden">
+            <div id="nav-actions" class="nav-actions hidden" style="display: flex; align-items: center; gap: 1rem;">
+                <button id="btn-refresh" class="btn btn-outline" aria-label="Refresh Data" title="Refresh Data" style="padding: 0.5rem; display: flex; align-items: center; justify-content: center;">
+                    <i class="ph ph-arrows-clockwise" style="font-size: 1.25rem;"></i>
+                </button>
                 <span id="user-greeting" class="user-greeting"></span>
                 <button id="btn-logout" class="btn btn-outline">Logout</button>
             </div>
@@ -67,12 +79,31 @@
         <!-- Contains four tab sections: My Movies, Recommendations, Add Movie, and Admin Panel (admin-only). -->
         <main id="view-dashboard" class="view hidden">
             
-            <!-- Tab Navigation -->
-            <div class="tabs">
-                <button class="tab-btn active" data-target="tab-watched">My Movies</button>
-                <button class="tab-btn" data-target="tab-recommend">Recommendations</button>
-                <button class="tab-btn" data-target="tab-add">Add Movie</button>
-                <button class="tab-btn hidden" data-target="tab-admin" id="btn-admin-tab">Admin Panel</button>
+            <!-- Floating Dock Navigation -->
+            <div class="hero-dock-wrapper">
+                <div class="hero-dock">
+                    <button class="dock-item active tab-btn" data-target="tab-watched" aria-label="My Movies">
+                        <i class="ph ph-film-strip"></i>
+                        <span class="tooltip">My Movies</span>
+                    </button>
+                    <button class="dock-item tab-btn" data-target="tab-recommend" aria-label="Recommendations">
+                        <i class="ph ph-magic-wand"></i>
+                        <span class="tooltip">For You</span>
+                    </button>
+                    <button class="dock-item tab-btn" data-target="tab-add" aria-label="Add Movie">
+                        <i class="ph ph-plus-circle"></i>
+                        <span class="tooltip">Track</span>
+                    </button>
+                    <span class="dock-divider"></span>
+                    <button class="dock-item tab-btn" data-target="tab-settings" aria-label="Settings">
+                        <i class="ph ph-gear"></i>
+                        <span class="tooltip">Settings</span>
+                    </button>
+                    <button class="dock-item tab-btn hidden" data-target="tab-admin" id="btn-admin-tab" aria-label="Admin Panel">
+                        <i class="ph ph-shield-check"></i>
+                        <span class="tooltip">Admin</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Tab: My Movies ---------------------------------------- -->
@@ -113,6 +144,67 @@
                 <div id="add-msg" class="msgbox hidden"></div>
             </section>
 
+            <!-- Tab: Settings ----------------------------------------- -->
+            <section id="tab-settings" class="tab-content hidden">
+                 <div class="section-header">
+                    <h3>Account Settings</h3>
+                    <p>Manage your preferences and AI features.</p>
+                </div>
+                <div id="settings-msg" class="msgbox hidden" style="margin-top: 1.5rem;"></div>
+
+                <!-- Settings Home View -->
+                <div id="settings-home" class="settings-view">
+                    <div class="settings-card" style="margin-top: 2rem;">
+                        <div class="settings-item">
+                            <div class="settings-info">
+                                <label for="ai-toggle">AI Discovery Features</label>
+                                <p>Personalized personality insights and explanations for recommendations.</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="ai-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                        <div class="settings-item">
+                            <div class="settings-info">
+                                <label for="max-toasts">Max Simultaneous Toasts</label>
+                                <p>Limit how many notifications appear on screen at once (1-20).</p>
+                            </div>
+                            <input type="number" id="input-max-toasts" min="1" max="20" class="input-large" style="width: 80px; text-align: center;">
+                        </div>
+                    </div>
+
+                    <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+                        <button class="settings-action-card" onclick="openSettingsModal('modal-update-username')">
+                            <i class="ph ph-user-circle"></i>
+                            <div class="text-left">
+                                <strong>Change Username</strong>
+                                <span>Your unique identity</span>
+                            </div>
+                        </button>
+                        <button class="settings-action-card" onclick="openSettingsModal('modal-update-email')">
+                            <i class="ph ph-envelope-simple"></i>
+                            <div class="text-left">
+                                <strong>Update Email</strong>
+                                <span>Change your contact address</span>
+                            </div>
+                        </button>
+                        <button class="settings-action-card" onclick="openSettingsModal('modal-update-password')">
+                            <i class="ph ph-lock"></i>
+                            <div class="text-left">
+                                <strong>Change Password</strong>
+                                <span>Update your security key</span>
+                            </div>
+                        </button>
+                    </div>
+
+                </div>
+            </section>
+
+
+
             <!-- Tab: Admin Panel (visible only to admin role) --------- -->
             <section id="tab-admin" class="tab-content hidden">
                  <div class="section-header">
@@ -139,6 +231,96 @@
             </section>
 
         </main>
+    </div>
+
+    <!-- TOAST NOTIFICATIONS CONTAINER -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- MODALS CONTAINER -->
+    <div id="modal-container">
+        <!-- Confirmation Modal -->
+        <div id="confirm-modal" class="modal-overlay hidden">
+            <div class="modal-box" id="confirm-box">
+                <!-- Content injected via JS -->
+            </div>
+        </div>
+
+        <!-- Update Username Modal -->
+        <div id="modal-update-username" class="modal-overlay hidden">
+            <div class="modal-box">
+                <h2>Change Username</h2>
+                <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.9rem;">Your username is your unique ID on CineWave.</p>
+                <form id="form-update-username" class="space-y-4 text-left">
+                    <div class="input-group">
+                        <label>Current Password</label>
+                        <input type="password" id="input-username-verify-password" placeholder="Confirm identity" required class="input-large w-100">
+                    </div>
+                    <div class="input-group">
+                        <label>New Username</label>
+                        <input type="text" id="input-new-username" placeholder="Enter new username" required class="input-large w-100">
+                    </div>
+                    <div class="modal-actions" style="margin-top: 2rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeSettingsModal('modal-update-username')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Username</button>
+                    </div>
+                </form>
+                <div id="msg-username" class="msgbox hidden" style="margin-top: 1.5rem;"></div>
+            </div>
+        </div>
+
+
+        <!-- Update Email Modal -->
+        <div id="modal-update-email" class="modal-overlay hidden">
+            <div class="modal-box">
+                <h2>Update Email</h2>
+                <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.9rem;">Verify your identity to change your contact address.</p>
+                <form id="form-update-email" class="space-y-4 text-left">
+                    <div class="input-group">
+                        <label>Current Password</label>
+                        <input type="password" id="input-email-verify-password" placeholder="Enter password to verify your identity" required class="input-large w-100">
+                    </div>
+                    <div class="input-group">
+                        <label>New Email Address</label>
+                        <input type="email" id="input-new-email" placeholder="Enter new email address" required class="input-large w-100">
+                    </div>
+
+                    <div class="modal-actions" style="margin-top: 2rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeSettingsModal('modal-update-email')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Apply Changes</button>
+                    </div>
+                </form>
+                <div id="msg-email" class="msgbox hidden" style="margin-top: 1.5rem;"></div>
+            </div>
+        </div>
+
+
+        <!-- Update Password Modal -->
+        <div id="modal-update-password" class="modal-overlay hidden">
+            <div class="modal-box">
+                <h2>Change Password</h2>
+                <p style="color: var(--text-muted); margin-bottom: 2rem; font-size: 0.9rem;">Choose a strong password to secure your account.</p>
+                <form id="form-update-password" class="space-y-4 text-left">
+                    <div class="input-group">
+                        <label>Current Password</label>
+                        <input type="password" id="input-pass-current" placeholder="Current password" required class="input-large w-100">
+                    </div>
+                    <div class="input-group">
+                        <label>New Password</label>
+                        <input type="password" id="input-new-password" placeholder="New password" required class="input-large w-100">
+                    </div>
+                    <div class="input-group">
+                        <label>Confirm New Password</label>
+                        <input type="password" id="input-new-password-confirm" placeholder="Repeat new password" required class="input-large w-100">
+                    </div>
+                    <div class="modal-actions" style="margin-top: 2rem;">
+                        <button type="button" class="btn btn-outline" onclick="closeSettingsModal('modal-update-password')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Password</button>
+                    </div>
+                </form>
+                <div id="msg-password" class="msgbox hidden" style="margin-top: 1.5rem;"></div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Application logic — loaded after the DOM is ready -->

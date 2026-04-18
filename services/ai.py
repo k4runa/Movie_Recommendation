@@ -130,7 +130,7 @@ class AIService:
         if not self.active or not watched_titles or not recommendations:
             return {}
 
-        rec_titles = [r.get("title") for r in recommendations]
+        rec_titles = [r.get("title", "") for r in recommendations]
         prompt = f"""
         Watch History: {', '.join(watched_titles)}
         Recommendations: {', '.join(rec_titles)}

@@ -17,8 +17,7 @@ Endpoints:
 import random
 from fastapi import APIRouter, Depends, HTTPException
 from services.schemas import MovieScheme, APIResponseWatchedMoviesList
-from services.deps import movies_manager
-from services.database import logger
+from services.deps import movies_manager, users_manager
 from services.auth import get_current_user
 from services.tmdb import fetch_recommendations
 from services.ai import ai_service
@@ -53,21 +52,21 @@ async def get_watched_movies(
     return {"success": True, "data": {"watched_movies": watched_movies}}
 
 
-@router.delete("/{username}/{title}")
+@router.delete("/{username}/{movie_id}")
 async def delete_movie(
-    username: str, title: str, current_user: dict = Depends(get_current_user)
+    username: str, movie_id: int, current_user: dict = Depends(get_current_user)
 ):
     """
     Remove a movie from the authenticated user's tracked collection.
 
-    The `title` path parameter is used to search TMDB and match the
-    corresponding tmdb_id in the database.
+    The `movie_id` path parameter is the database primary key of the
+    tracked movie record.  No external API call is required.
     """
     if current_user.get("username") != username:
         raise HTTPException(
             status_code=403, detail="Not authorized to access this resource"
         )
-    success = await movies_manager.delete_movie(username, title)  # type: ignore
+    success = await movies_manager.delete_movie(username, movie_id)  # type: ignore
     return {"success": success}
 
 
@@ -127,12 +126,13 @@ async def get_recommendations(
     random.shuffle(filtered_recs)
     final_recs = filtered_recs[:10]
 
-    # Optionally enrich with AI-generated explanations if Gemini is active
-    if ai_service.active and watched:
+    # Optionally enrich with AI-generated explanations if Gemini is active and user enabled AI
+    user_db = await users_manager.get_user_by_username(username)
+    if ai_service.active and watched and user_db.get("ai_enabled"):
         watched_titles = [m.get("title") for m in watched[-10:]]  # Use last 10 for context
         explanations = await ai_service.explain_recommendations(watched_titles, final_recs)
         for r in final_recs:
-            r["ai_reason"] = explanations.get(r.get("title"))
+            r["ai_reason"] = explanations.get(r.get("title","N/A"),"N/A")
 
     return {"success": True, "data": {"recommendations": final_recs}}
 
@@ -151,6 +151,10 @@ async def get_ai_insights(username: str, current_user: dict = Depends(get_curren
 
     if not ai_service.active:
         return {"success": False, "message": "AI service is not configured."}
+
+    user_db = await users_manager.get_user_by_username(username)
+    if not user_db.get("ai_enabled"):
+        return {"success": False, "message": "AI features are disabled by the user."}
 
     # Fetch last 20 movies for analysis context
     watched = await movies_manager.get_watched_movies(username, skip=0, limit=20)  # type: ignore

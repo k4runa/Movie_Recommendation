@@ -21,9 +21,9 @@
 /* 1. DESIGN TOKENS */
 
 :root {
-    --bg-dark: #09090b;       /* Page background — near black          */
-    --glass-bg: #111113;      /* Container / card background            */
-    --glass-border: #27272a;  /* Border color — Zinc-800               */
+    --bg-dark: #0a0a0a;       /* Page background — pure deep dark      */
+    --glass-bg: #121212;      /* Container / card background            */
+    --glass-border: #262626;  /* Border color — neutral gray            */
     --primary: #f4f4f5;       /* Primary text / accent — Zinc-100      */
     --secondary: #a1a1aa;     /* Secondary text — Zinc-400             */
     --text-light: #fafafa;    /* Standard body text — Zinc-50          */
@@ -202,42 +202,99 @@ input:focus {
 }
 
 
-/* 6. DASHBOARD & TABS */
+/* 6. DASHBOARD DOCK (Shadcn dock-two Style) */
 
-.tabs {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-    border-bottom: 1px solid var(--glass-border);
-    padding-bottom: 1rem;
+.hero-dock-wrapper {
+    position: fixed;
+    bottom: 2.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    /* Continuous floating animation for the whole dock */
+    animation: floatingDock 4s ease-in-out infinite;
 }
 
-.tab-btn {
+@keyframes floatingDock {
+    0% { transform: translateX(-50%) translateY(-2px); }
+    50% { transform: translateX(-50%) translateY(2px); }
+    100% { transform: translateX(-50%) translateY(-2px); }
+}
+
+.hero-dock {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem; /* gap-1 */
+    padding: 0.5rem; /* p-2 */
+    background: rgba(10, 10, 10, 0.9); /* bg-background/90 */
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 1rem; /* rounded-2xl */
+    border: 1px solid rgba(255, 255, 255, 0.1); /* border-border */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5); /* shadow-lg */
+    transition: box-shadow 0.3s;
+}
+
+.hero-dock:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6); /* hover:shadow-xl */
+}
+
+.dock-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem; 
+    height: 3rem;
+    border-radius: 0.5rem; /* rounded-lg */
     background: transparent;
     border: none;
-    color: var(--text-muted);
-    font-size: 1.1rem;
-    font-weight: 600;
+    color: var(--text-light); /* text-foreground */
+    font-size: 1.25rem; /* w-5 h-5 */
     cursor: pointer;
-    padding: 0.5rem 1rem;
-    transition: color 0.3s ease;
+    transition: background 0.2s, transform 0.2s;
 }
 
-.tab-btn.active {
-    color: var(--text-light);
-    position: relative;
+.dock-item:hover {
+    background: rgba(255, 255, 255, 0.1); /* hover:bg-secondary */
+    transform: translateY(-2px) scale(1.1); /* whileHover={{ scale: 1.1, y: -2 }} */
 }
 
-/* Active tab underline indicator */
-.tab-btn.active::after {
-    content: '';
+.dock-item:active {
+    transform: scale(0.95); /* whileTap={{ scale: 0.95 }} */
+}
+
+.dock-item.active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.dock-divider {
+    width: 1px;
+    height: 1.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0 0.25rem;
+}
+
+/* Tooltip on hover */
+.dock-item .tooltip {
     position: absolute;
-    bottom: -17px;
-    left: 0;
-    width: 100%;
-    height: 3px;
-    background: var(--primary);
-    border-radius: 3px 3px 0 0;
+    top: -2.5rem; /* -top-8 */
+    left: 50%;
+    transform: translateX(-50%);
+    background: #18181b; /* bg-popover */
+    color: #fff; /* text-popover-foreground */
+    padding: 0.25rem 0.5rem; /* px-2 py-1 */
+    border-radius: 0.25rem; /* rounded */
+    font-size: 0.75rem; /* text-xs */
+    font-weight: 400;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.dock-item:hover .tooltip {
+    opacity: 1;
 }
 
 
@@ -250,20 +307,83 @@ input:focus {
     padding-top: 1.5rem;
 }
 
+@property --angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
 .movie-card {
-    background: #18181b;
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
+    background: rgba(18, 18, 18, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 16px;
     padding: 1.5rem;
-    transition: transform 0.2s ease, border-color 0.2s ease;
     display: flex;
     flex-direction: column;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* The animated border layer using mask trick */
+.movie-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 2px; /* Border thickness */
+    background: conic-gradient(from var(--angle), transparent 40%, rgba(161, 161, 170, 0.2) 80%, rgba(250, 250, 250, 0.7) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+@keyframes spin-angle {
+    to {
+        --angle: 360deg;
+    }
 }
 
 .movie-card:hover {
-    transform: translateY(-2px);
-    border-color: #3f3f46;
+    transform: translateY(-5px) scale(1.02) perspective(1000px) rotateX(2deg) rotateY(-2deg);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 255, 255, 0.05);
+    z-index: 10;
 }
+
+.movie-card:hover::before {
+    opacity: 1;
+    animation: spin-angle 2.5s linear infinite;
+}
+
+/* Staggered entrance animation for cards */
+@keyframes cardEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.movie-card {
+    animation: cardEntrance 0.6s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+.movie-card:nth-child(1) { animation-delay: 0.05s; }
+.movie-card:nth-child(2) { animation-delay: 0.10s; }
+.movie-card:nth-child(3) { animation-delay: 0.15s; }
+.movie-card:nth-child(4) { animation-delay: 0.20s; }
+.movie-card:nth-child(5) { animation-delay: 0.25s; }
+.movie-card:nth-child(6) { animation-delay: 0.30s; }
+.movie-card:nth-child(7) { animation-delay: 0.35s; }
+.movie-card:nth-child(8) { animation-delay: 0.40s; }
 
 .movie-card h4 {
     font-size: 1.15rem;
@@ -281,14 +401,17 @@ input:focus {
     padding-bottom: 0.5rem;
 }
 
-/* Clamped description — prevents cards from growing too tall */
+/* Clamped description — prevents cards from growing too tall but allows flexibility */
 .desc-line {
     font-size: 0.85rem; 
     color: #a1a1aa; 
-    margin-bottom: 1.5rem; 
+    margin-bottom: 1rem; 
     line-height: 1.4;
-    height: 3.8rem; 
-    overflow: hidden; 
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Remove / Delete button (used in cards) */
@@ -385,7 +508,11 @@ input:focus {
 
 .hidden { display: none !important; }
 .cursor-pointer { cursor: pointer; }
-.w-100 { width: 100%; }
+.w-100 { width: 100% !important; }
+.text-left { text-align: left !important; }
+.text-center { text-align: center !important; }
+.text-right { text-align: right !important; }
+
 
 .error-msg {
     color: var(--danger);
@@ -430,9 +557,292 @@ input:focus {
 
 .ai-reason {
     font-size: 0.8rem;
-    background: rgba(161, 161, 170, 0.1);
-    padding: 0.6rem;
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.75rem;
+    border-radius: 8px;
     margin-top: 0.5rem;
-    border-left: 2px solid var(--secondary);
+    margin-bottom: 1rem; /* Crucial: Space between insight and button */
+    border-left: 3px solid rgba(255, 255, 255, 0.5); /* Replaced secondary with elegant silver */
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.85);
 }
+
+/* --- Toggle Switch --- */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--glass-border);
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: var(--primary);
+}
+input:checked + .slider:before {
+    background-color: var(--bg-dark);
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px var(--primary);
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+/* 10. TOAST NOTIFICATIONS */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 20000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    min-width: 250px;
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    background: rgba(18, 18, 18, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateX(120%);
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s;
+    opacity: 0;
+}
+
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast.success { border-left: 4px solid #2ecc71; }
+.toast.error { border-left: 4px solid #e74c3c; }
+.toast.info { border-left: 4px solid #3498db; }
+
+/* Pulse animation for the refresh button icon */
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* 11. SETTINGS UI COMPONENTS */
+.settings-view {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.settings-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.settings-info label {
+    font-size: 1.1rem;
+    color: #fff;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.settings-info p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.settings-action-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    color: inherit;
+    font-family: inherit;
+}
+
+.settings-action-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.settings-action-card i {
+    font-size: 1.75rem;
+    color: var(--primary);
+    opacity: 0.8;
+}
+
+.settings-action-card strong {
+    display: block;
+    font-size: 1rem;
+    color: #fff;
+    margin-bottom: 0.1rem;
+}
+
+.settings-action-card span {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.btn-back {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0;
+    margin-bottom: 1rem;
+    transition: color 0.2s;
+}
+
+.btn-back:hover {
+    color: #fff;
+}
+
+.space-y-4 > * + * {
+    margin-top: 1rem;
+}
+
+.w-100 { width: 100%; }
+
+.slider.round {
+    border-radius: 34px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
+/* 11. CUSTOM MODAL */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.modal-overlay.show {
+    opacity: 1;
+}
+
+.modal-box {
+    background: rgba(18, 18, 18, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2.5rem;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transform: scale(0.95) translateY(10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.modal-box.show {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+}
+
+.modal-icon {
+    font-size: 3.5rem;
+    color: #e74c3c;
+    margin-bottom: 1rem;
+}
+
+.modal-msg {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 2rem;
+    line-height: 1.5;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-danger:hover {
+    background: #c0392b;
+    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+}
+

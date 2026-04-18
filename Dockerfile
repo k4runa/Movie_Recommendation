@@ -6,7 +6,7 @@
 # Build:  docker build -t cinewave-api .
 # Run:    docker run -p 8000:8000 --env-file .env cinewave-api
 
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # Set working directory inside the container
 WORKDIR /app

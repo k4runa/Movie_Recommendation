@@ -77,6 +77,9 @@ class UserResponse(BaseModel):
     city: str
     created_at: str
     last_seen: str
+    ai_enabled: bool
+    max_toasts: int
+
 
 
 class MovieResponse(BaseModel):

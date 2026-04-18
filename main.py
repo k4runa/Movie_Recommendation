@@ -21,10 +21,12 @@ from services.database import (
     UserAlreadyExists,
     UserNotFoundError,
     MovieAlreadyExists,
+    MovieNotFoundError,
     ReservedUsernameError,
 )
 from services.deps import users_manager
 from routers import auth, users, movies
+from sqlalchemy.exc import IntegrityError
 
 # ---------------------------------------------------------------------------
 # Lifespan Management
@@ -113,6 +115,13 @@ async def movie_exists_handler(request: Request, exc: MovieAlreadyExists):
     return JSONResponse(status_code=409, content={"detail": "Movie already exists"})
 
 
+@app.exception_handler(MovieNotFoundError)
+async def movie_not_found_handler(request: Request, exc: MovieNotFoundError):
+    """Return 404 when the movie is not found in the user's tracked list."""
+    logger.warning(f"{request.method} {request.url} -> {exc}")
+    return JSONResponse(status_code=404, content={"detail": "Movie not found"})
+
+
 @app.exception_handler(ReservedUsernameError)
 async def reserved_username_handler(request: Request, exc: ReservedUsernameError):
     """Return 400 when attempting to register a restricted username."""
@@ -120,6 +129,19 @@ async def reserved_username_handler(request: Request, exc: ReservedUsernameError
     return JSONResponse(
         status_code=400,
         content={"detail": str(exc)},
+    )
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError):
+    """
+    Catch-all for DB constraint violations (like unique constraints triggered by race conditions).
+    Converts 500 errors into 409 Conflicts to act as an idempotent-safe response.
+    """
+    logger.warning(f"Integrity Error (Race condition prevented): {request.method} {request.url} -> {exc}")
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "Resource already exists or constraint violated. Request safely ignored."},
     )
 
 

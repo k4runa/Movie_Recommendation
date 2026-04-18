@@ -22,16 +22,16 @@ from sqlalchemy import (
     Integer,
     Boolean,
     select,
+    delete,
+    UniqueConstraint,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.orm import relationship, DeclarativeBase
+from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
+from fastapi.concurrency import run_in_threadpool
 from functools import wraps
+from typing import List, Optional
 import logging
 import bcrypt
-import socket
-import httpx
-import psutil
-import platform
 from datetime import datetime, timezone
 from collections import Counter
 from dotenv import load_dotenv
@@ -47,54 +47,7 @@ logging.basicConfig(level=logging.INFO, format=format)
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# System Metadata Collectors
-# ---------------------------------------------------------------------------
-# These functions gather client environment data at registration time.
-# The data is stored alongside the user record for admin analytics.
-# ---------------------------------------------------------------------------
 
-
-def collect_device_info() -> dict[str, str]:
-    """
-    Collect hardware and OS metadata from the host machine.
-
-    Returns:
-        dict with keys: device, device_name, machine, os, hostname, memory
-    """
-    return {
-        "device": platform.platform(),
-        "device_name": platform.node(),
-        "machine": platform.machine(),
-        "os": platform.system(),
-        "hostname": socket.gethostname(),
-        "memory": f"{round(psutil.virtual_memory().total / (1024**3), 2)} GB",
-    }
-
-
-async def fetch_network_info() -> dict[str, str]:
-    """
-    Retrieve geolocation and IP data from the ipinfo.io API.
-
-    Uses httpx for non-blocking async HTTP calls. Falls back to 'unknown'
-    values on network errors so that user registration is never blocked
-    by a third-party outage.
-
-    Returns:
-        dict with keys: country, city, ip
-    """
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get("https://ipinfo.io/json")
-            data: dict = response.json()
-        return {
-            "country": data.get("country", "unknown"),
-            "city": data.get("city", "unknown"),
-            "ip": data.get("ip", "unknown"),
-        }
-    except Exception as e:
-        logger.warning(f"Could not fetch network info: {str(e)}")
-        return {"country": "unknown", "city": "unknown", "ip": "unknown"}
 
 
 # ---------------------------------------------------------------------------
@@ -171,35 +124,39 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True)
-    username = Column(String, unique=True, nullable=False)
-    role = Column(String, nullable=False, default="user", server_default="user")
-    password = Column(String, nullable=False)
-    email = Column(String, unique=True, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False, default="user", server_default="user")
+    password: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
 
     # --- Device fingerprint (collected at signup) ---
-    device = Column(String, nullable=True)
-    device_name = Column(String, nullable=True)
-    machine = Column(String, nullable=True)
-    os = Column(String, nullable=True)
-    memory = Column(String, nullable=True)
-    hostname = Column(String, nullable=True)
+    device: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    device_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    machine: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    os: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    memory: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    hostname: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # --- Network / geolocation ---
-    country = Column(String, nullable=True)
-    city = Column(String, nullable=True)
-    ip = Column(String, nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    ip: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # --- Account settings ---
+    ai_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    max_toasts: Mapped[int] = mapped_column(Integer, nullable=False, default=5, server_default="5")
 
     # --- Account lifecycle ---
-    is_deleted = Column(Boolean, nullable=False, default=False)
-    created_at = Column(
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[str] = mapped_column(
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
-    last_seen = Column(
+    last_seen: Mapped[str] = mapped_column(
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
 
-    movies = relationship("Movies", back_populates="user", lazy="selectin")
+    movies: Mapped[List["Movies"]] = relationship("Movies", back_populates="user", lazy="selectin")
 
 
 class Movies(Base):
@@ -216,18 +173,19 @@ class Movies(Base):
     """
 
     __tablename__ = "movies"
+    __table_args__ = (UniqueConstraint("user_id", "tmdb_id", name="uq_user_tmdb_movie"),)
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    tmdb_id = Column(Integer, nullable=False)
-    title = Column(String, nullable=False)
-    overview = Column(String, nullable=True)
-    genre_ids = Column(String, nullable=False)  # Comma-separated TMDB genre IDs
-    vote_average = Column(String, nullable=True)
-    status = Column(String, nullable=False, default="Not yet")
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    tmdb_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    overview: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    genre_ids: Mapped[str] = mapped_column(String, nullable=False)  # Comma-separated TMDB genre IDs
+    vote_average: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="Not yet")
 
-    user = relationship("User", back_populates="movies")
-    watched_movies = relationship("WatchedMovies", back_populates="who_watched", lazy="selectin")
+    user: Mapped["User"] = relationship("User", back_populates="movies")
+    watched_movies: Mapped[List["WatchedMovies"]] = relationship("WatchedMovies", back_populates="who_watched", lazy="selectin", cascade="all, delete-orphan")
 
 
 class WatchedMovies(Base):
@@ -240,17 +198,18 @@ class WatchedMovies(Base):
     """
 
     __tablename__ = "watched_movies"
+    __table_args__ = (UniqueConstraint("user_id", "movie_id", name="uq_user_watched_movie"),)
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    movie_id = Column(Integer, ForeignKey("movies.id"))
-    title = Column(String, nullable=False)
-    status = Column(String, nullable=False, default="Watched")
-    watched_at = Column(
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="Watched")
+    watched_at: Mapped[str] = mapped_column(
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
 
-    who_watched = relationship("Movies", back_populates="watched_movies")
+    who_watched: Mapped["Movies"] = relationship("Movies", back_populates="watched_movies")
 
 
 # ---------------------------------------------------------------------------
@@ -339,9 +298,7 @@ class UserManager:
         if user.username.lower() in RESERVED_USERNAMES:
             raise ReservedUsernameError(user.username)
 
-        hashed = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt())
-        network_data = await fetch_network_info()
-        device_info = collect_device_info()
+        hashed = await run_in_threadpool(bcrypt.hashpw, user.password.encode("utf-8"), bcrypt.gensalt())
         created_at = datetime.now(timezone.utc).isoformat()
 
         # Registration now always defaults to the 'user' role.
@@ -353,15 +310,16 @@ class UserManager:
             role=assigned_role,
             password=hashed.decode("utf-8"),
             email=user.email,
-            device=device_info.get("device"),
-            device_name=device_info.get("device_name"),
-            machine=device_info.get("machine"),
-            os=device_info.get("os"),
-            memory=device_info.get("memory"),
-            hostname=device_info.get("hostname"),
-            country=network_data.get("country"),
-            city=network_data.get("city"),
-            ip=network_data.get("ip"),
+            device="unknown",
+            device_name="unknown",
+            machine="unknown",
+            os="unknown",
+            memory="unknown",
+            hostname="unknown",
+            country="unknown",
+            city="unknown",
+            ip="unknown",
+            ai_enabled=True,
             is_deleted=False,
             created_at=created_at,
             last_seen=created_at,
@@ -428,7 +386,7 @@ class UserManager:
             return
 
         # Seed the superuser
-        hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+        hashed = await run_in_threadpool(bcrypt.hashpw, password.encode("utf-8"), bcrypt.gensalt())
         created_at = datetime.now(timezone.utc).isoformat()
 
         new_admin = User(
@@ -442,6 +400,7 @@ class UserManager:
             city="System",
             country="System",
             ip="127.0.0.1",
+            ai_enabled=True,
         )
         session.add(new_admin)
         logger.info(f"Successfully seeded superuser: {username}")
@@ -496,26 +455,88 @@ class UserManager:
         ]
 
     @transaction
-    async def update_user_field(self, session: AsyncSession, username: str, field: str, value: str) -> bool:
+    async def update_user_field(
+        self, session: AsyncSession, username: str, field: str, value: str, current_password: Optional[str] = None
+    ) -> bool:
         """
         Update a single field on a user record.
 
-        Password values are automatically bcrypt-hashed before storage.
+        Sensitive updates (password, email) require 'current_password' verification.
+        Enforces a whitelist of allowed fields to prevent privilege escalation.
 
         Raises:
             UserNotFoundError: If the target user does not exist.
+            ValueError: If an unauthorized field is requested or password verification fails.
         """
         stmt = select(User).where(User.username == username)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(username)
-        if field.lower() == "password":
-            hashed = bcrypt.hashpw(value.encode("utf-8"), bcrypt.gensalt())
-            setattr(user, field, hashed.decode("utf-8"))
+
+        f_lower = field.lower()
+        ALLOWED_FIELDS = {"password", "email", "ai_enabled", "username", "max_toasts"}
+        
+        if f_lower not in ALLOWED_FIELDS:
+            logger.warning(f"Unauthorized update attempt on field '{field}' for user {username}")
+            raise ValueError(f"Field '{field}' cannot be updated via this endpoint.")
+
+        # Require password verification for sensitive changes
+        if f_lower in {"password", "email"}:
+            if not current_password:
+                raise ValueError("Current password is required to change this setting.")
+            
+            # Verify current password (offloaded to threadpool to avoid blocking event loop)
+            stored_hash = user.password.encode("utf-8")
+            if not await run_in_threadpool(bcrypt.checkpw, current_password.encode("utf-8"), stored_hash):
+                logger.warning(f"Failed password verification for user {username}")
+                raise ValueError("Invalid current password.")
+
+            # Prevent updating to the exact same value
+            if f_lower == "email":
+                if value.lower() == user.email.lower():
+                    raise ValueError("New email must be different from your current one.")
+            
+            if f_lower == "password":
+                if await run_in_threadpool(bcrypt.checkpw, value.encode("utf-8"), stored_hash):
+                    raise ValueError("New password must be different from your current one.")
+            
+            if f_lower == "username":
+                if value.lower() == user.username.lower():
+                    raise ValueError("New username must be different from your current one.")
+
+        if f_lower == "password":
+            hashed = await run_in_threadpool(bcrypt.hashpw, value.encode("utf-8"), bcrypt.gensalt())
+            setattr(user, "password", hashed.decode("utf-8"))
             return True
-        setattr(user, field, value)
-        logger.info(f"Updated user: {user.username} - {field}: {value}")
+
+        if f_lower == "ai_enabled":
+            bool_value = str(value).lower() in ("true", "1", "yes", "t")
+            setattr(user, "ai_enabled", bool_value)
+            return True
+
+        if f_lower == "max_toasts":
+            try:
+                val = int(value)
+                if val < 1 or val > 20:
+                    raise ValueError("Max toasts must be between 1 and 20.")
+                setattr(user, "max_toasts", val)
+                return True
+            except (TypeError, ValueError):
+                raise ValueError("Invalid value for max_toasts. Must be a number.")
+
+        if f_lower == "username":
+            # Check for uniqueness
+            stmt = select(User).where(User.username == value)
+            existing = await session.execute(stmt)
+            if existing.scalar_one_or_none():
+                raise ValueError(f"Username '{value}' is already taken.")
+            setattr(user, "username", value)
+            return True
+
+        # For 'email', we just set it directly
+        setattr(user, f_lower, value)
+        logger.info(f"Updated user: {user.username} - {field}")
         return True
 
 
@@ -572,14 +593,16 @@ class MovieManager:
             List of up to 5 integer genre IDs, sorted by frequency
             (most common first).  Empty list if the user has no movies.
         """
-        genre_ids = ""
         async with self.session() as session:
-            stmt = select(User).where(User.username == username)
+            stmt = (
+                select(Movies.genre_ids)
+                .join(User, User.id == Movies.user_id)
+                .where(User.username == username)
+            )
             result = await session.execute(stmt)
-            user = result.scalar_one_or_none()
-            if user and user is not None:
-                for movie in user.movies:
-                    genre_ids += "," + movie.genre_ids
+            genre_rows = result.scalars().all()
+            
+        genre_ids = ",".join(genre_rows)
         genre_ids = genre_ids.strip(",")
         if not genre_ids or genre_ids is None:
             logger.info(f"User {username} hasn't rated/watched enough categories yet.")
@@ -596,6 +619,9 @@ class MovieManager:
         """
         Return a paginated list of movies tracked by the given user.
 
+        Pagination is performed at the SQL level (OFFSET/LIMIT) to avoid
+        loading all movies into memory.
+
         Args:
             username: Owner of the movie collection.
             skip:     Number of items to skip (offset).
@@ -604,26 +630,36 @@ class MovieManager:
         Raises:
             UserNotFoundError: If no user with the given username exists.
         """
-        stmt = select(User).where(User.username == username)
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-        if not user:
+        # Verify user exists without loading the full relationship graph
+        user_stmt = select(User.id).where(User.username == username)
+        user_result = await session.execute(user_stmt)
+        user_row = user_result.scalar_one_or_none()
+        if user_row is None:
             raise UserNotFoundError(username)
-        # Slice-based pagination on the loaded relationship
+
+        # SQL-level pagination — only fetches the requested slice
+        movies_stmt = (
+            select(Movies)
+            .where(Movies.user_id == user_row)
+            .offset(skip)
+            .limit(limit)
+        )
+        movies_result = await session.execute(movies_stmt)
+        movies = movies_result.scalars().all()
         return [
             {c.name: getattr(m, c.name) for c in m.__table__.columns}
-            for m in user.movies[skip : skip + limit]
+            for m in movies
         ]
 
     @transaction
-    async def delete_movie(self, session: AsyncSession, username: str, query: str) -> bool:
+    async def delete_movie(self, session: AsyncSession, username: str, movie_id: int) -> bool:
         """
-        Remove a movie from a user's tracked collection.
+        Remove a movie from a user's tracked collection by its database ID.
 
-        The movie is identified by searching TMDB with the given query
-        string and matching the resulting tmdb_id against the database.
+        Uses the primary key directly — no external API dependency required.
 
         Raises:
+            UserNotFoundError:  If the user does not exist.
             MovieNotFoundError: If the movie is not in the user's list.
         """
         stmt = select(User).where(User.username == username)
@@ -631,57 +667,83 @@ class MovieManager:
         user = result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(username)
-            
-        data = await fetch_tmdb_data(query)
-        is_exist_stmt = select(Movies).where(
-            Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
-        )
-        is_exist_result = await session.execute(is_exist_stmt)
-        is_exist = is_exist_result.scalar_one_or_none()
-        if not is_exist:
-            raise MovieNotFoundError(data.get("title"))  # type:ignore
-        if user and user is not None:
-            await session.delete(is_exist)
-            logger.info(f"Deleted movie: {data.get('title')} - {user.username}")
-            return True
-        return False
 
-    @transaction
-    async def update_status(self, session: AsyncSession, username: str, status: str, query: str) -> bool:
+        movie_stmt = select(Movies).where(
+            Movies.id == movie_id, Movies.user_id == user.id
+        )
+        movie_result = await session.execute(movie_stmt)
+        movie = movie_result.scalar_one_or_none()
+        if not movie:
+            raise MovieNotFoundError(str(movie_id))
+
+        await session.delete(movie)
+        logger.info(f"Deleted movie: {movie.title} (id={movie_id}) - {user.username}")
+        return True
+
+    async def update_status(self, username: str, status: str, query: str) -> bool:
         """
         Mark a tracked movie with a new status (e.g. 'Watched').
 
         Creates a WatchedMovies record with the current UTC timestamp.
 
         Raises:
-            MovieAlreadyExists: If the movie already has this status.
+            MovieNotFoundError: If the movie is not in the user's tracked list or TMDB fails.
+            MovieAlreadyExists: If the movie already has a WatchedMovies entry.
             UserNotFoundError:  If the user does not exist.
         """
-        stmt = select(User).where(User.username == username)
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-        if not user:
-            raise UserNotFoundError(username)
-
         data = await fetch_tmdb_data(query)
-        is_exists_stmt = select(Movies).where(
-            Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
-        )
-        is_exists_result = await session.execute(is_exists_stmt)
-        is_exists = is_exists_result.scalar_one_or_none()
-        if is_exists:
-            raise MovieAlreadyExists(data.get("title"))  # type: ignore
-        if user and user is not None:
-            movie = WatchedMovies(
-                user_id=user.id,
-                movie_id=is_exists.id,
-                title=data.get("title"),
-                status=status,
-                watched_at=datetime.now(timezone.utc).isoformat(),
-            )
-            session.add(movie)
-            return True
-        raise UserNotFoundError(username)
+        if not data:
+            raise MovieNotFoundError(query)
+
+        async with self.session() as session:
+            try:
+                stmt = select(User).where(User.username == username)
+                result = await session.execute(stmt)
+                user = result.scalar_one_or_none()
+                if not user:
+                    raise UserNotFoundError(username)
+
+                movie_stmt = select(Movies).where(
+                    Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
+                )
+                movie_result = await session.execute(movie_stmt)
+                movie = movie_result.scalar_one_or_none()
+                if not movie:
+                    raise MovieNotFoundError(data.get("title", query))
+
+                # Update status on the tracked movie
+                movie.status = status
+
+                if status == "Watched":
+                    # Check if already marked as watched
+                    already_watched_stmt = select(WatchedMovies).where(
+                        WatchedMovies.user_id == user.id, WatchedMovies.movie_id == movie.id
+                    )
+                    already_watched_result = await session.execute(already_watched_stmt)
+                    if already_watched_result.scalar_one_or_none():
+                        raise MovieAlreadyExists(movie.title)
+                    
+                    watched_entry = WatchedMovies(
+                        user_id=user.id,
+                        movie_id=movie.id,
+                        title=movie.title,
+                        status=status,
+                        watched_at=datetime.now(timezone.utc).isoformat(),
+                    )
+                    session.add(watched_entry)
+                else:
+                    # If changed from Watched to something else, remove from WatchedMovies
+                    await session.execute(
+                        delete(WatchedMovies).where(
+                            WatchedMovies.user_id == user.id, WatchedMovies.movie_id == movie.id
+                        )
+                    )
+
+                await session.commit()
+                return True
+            except Exception:
+                await session.rollback()
+                raise
 
     @transaction
     async def add_movie(self, session: AsyncSession, username: str, query: str) -> bool:
