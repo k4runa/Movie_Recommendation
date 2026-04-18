@@ -8,6 +8,7 @@
     <!-- Google Fonts — Outfit for a clean, modern feel -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/ui/css/style.css">
+    <link rel="icon" type="image/png" href="/ui/img/favicon.png">
     
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -27,8 +28,9 @@
         
 <!-- NAVBAR -->
         <nav class="navbar">
-            <div class="logo">
-                <span class="gradient-text">CineWave</span> API
+            <div class="logo" style="display: flex; align-items: center; gap: 0.75rem;">
+                <img src="/ui/img/favicon.png" alt="CineWave Logo" style="width: 32px; height: 32px;">
+                <span class="gradient-text">CineWave</span>
             </div>
             <div id="nav-actions" class="nav-actions hidden" style="display: flex; align-items: center; gap: 1rem;">
                 <button id="btn-refresh" class="btn btn-outline" aria-label="Refresh Data" title="Refresh Data" style="padding: 0.5rem; display: flex; align-items: center; justify-content: center;">
@@ -44,6 +46,7 @@
         <main id="view-auth" class="view section-active">
             <div class="auth-box">
                 <div class="auth-header">
+                    <img src="/ui/img/logo.png" alt="CineWave Banner" style="width: 120px; margin-bottom: 1.5rem;">
                     <h2 id="auth-title">Welcome Back</h2>
                     <p id="auth-subtitle">Enter your details to dive into your movies.</p>
                 </div>
