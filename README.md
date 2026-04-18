@@ -71,5 +71,5 @@ Access the frontend by visiting `http://localhost:8000/` in your browser.
 The project includes a comprehensive test suite using `pytest`.
 
 ```bash
-pytest
+python3 -m pytest tests/
 ```
