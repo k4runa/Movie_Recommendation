@@ -1127,9 +1127,28 @@ async function adjustToasts(delta) {
     if (val > 20) val = 20;
     
     input.value = val;
+    await syncMaxToasts(val);
+}
+
+/**
+ * Handle direct input changes for max_toasts.
+ */
+async function handleUpdateMaxToasts(e) {
+    let val = parseInt(e.target.value) || 5;
     
+    // Enforce range [1, 20]
+    if (val < 1) val = 1;
+    if (val > 20) val = 20;
+    
+    e.target.value = val;
+    await syncMaxToasts(val);
+}
+
+/**
+ * Common logic to sync max_toasts to backend and localStorage.
+ */
+async function syncMaxToasts(val) {
     try {
-        // Persist to backend
         const res = await fetchWithAuth(`/users/${currentUsername}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -1138,7 +1157,6 @@ async function adjustToasts(delta) {
         
         if (!res.ok) throw new Error("Sync failed");
 
-        // Update local state
         localStorage.setItem('max_toasts', val);
         showToast(`Max notifications set to ${val}`, "info");
     } catch (err) {
@@ -1146,6 +1164,8 @@ async function adjustToasts(delta) {
         showToast("Setting updated locally, but failed to sync with cloud.", "error");
     }
 }
+
+window.adjustToasts = adjustToasts;
 
 
 // BOOTSTRAP
