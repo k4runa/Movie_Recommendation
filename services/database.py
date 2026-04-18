@@ -362,31 +362,23 @@ class UserManager:
     async def ensure_admin_exists(self, session: AsyncSession) -> None:
         """
         Ensures at least one admin exists in the system.
-
-        Reads INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD, and
-        INITIAL_ADMIN_EMAIL from environment variables. If no user with the
-        'admin' role exists, it creates one using these credentials.
-
-        This is intended to be called at application startup.
         """
-        stmt = select(User).where(User.role == "admin")
-        result = await session.execute(stmt)
-        admin_exists = result.scalar_one_or_none()
-        if admin_exists:
-            logger.info("Admin account already exists. Skipping seed.")
-            return
-
         import os
-
         username = os.getenv("INITIAL_ADMIN_USERNAME")
         password = os.getenv("INITIAL_ADMIN_PASSWORD")
         email = os.getenv("INITIAL_ADMIN_EMAIL")
 
         if not username or not password or not email:
             logger.warning(
-                "Initial admin credentials not fully provided in .env. "
-                "Skipping superuser seeding."
+                "Initial admin credentials not fully provided. Skipping superuser seeding."
             )
+            return
+
+        # Check by USERNAME instead of just role to prevent UniqueViolation errors
+        stmt = select(User).where(User.username == username)
+        result = await session.execute(stmt)
+        if result.scalar_one_or_none():
+            logger.info(f"Admin seed: User '{username}' already exists. Skipping.")
             return
 
         # Seed the superuser
@@ -406,8 +398,15 @@ class UserManager:
             ip="127.0.0.1",
             ai_enabled=True,
         )
-        session.add(new_admin)
-        logger.info(f"Successfully seeded superuser: {username}")
+        
+        try:
+            session.add(new_admin)
+            await session.flush() # Try to push to DB early to catch errors here
+            logger.info(f"Successfully seeded superuser: {username}")
+        except Exception as e:
+            # If another worker beat us to it, just log and continue
+            logger.warning(f"Admin seeding conflict (likely another worker): {str(e)}")
+            await session.rollback()
 
     @transaction
     async def get_user_by_username(self, session: AsyncSession, username: str) -> dict:
