@@ -16,6 +16,12 @@ from services.deps import users_manager
 router = APIRouter(tags=["auth"])
 
 
+import bcrypt
+
+# Pre-computed dummy hash to prevent timing attacks
+DUMMY_HASH = bcrypt.hashpw(b"dummy_password", bcrypt.gensalt()).decode("utf-8")
+
+
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """
@@ -29,12 +35,17 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
                            is incorrect.  The error message is intentionally
                            vague to prevent user enumeration.
     """
+    user_in_db = None
     try:
         user_in_db = await users_manager.get_user_by_username(form_data.username)  # type: ignore
     except UserNotFoundError:
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
+        pass
 
-    if not await verify_password(form_data.password, user_in_db.get("password", "")):
+    # Normalize response time to prevent User Enumeration via Timing Attacks
+    hashed = user_in_db.get("password", "") if user_in_db else DUMMY_HASH
+    is_valid = await verify_password(form_data.password, hashed)
+
+    if not user_in_db or not is_valid:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
 
     access_token = create_access_token(data={"sub": user_in_db["username"]})
