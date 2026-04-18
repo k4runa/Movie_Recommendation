@@ -237,7 +237,11 @@ class UserManager:
     """
 
     def __init__(self, db_url: str, echo: bool = False):
-        self.engine = create_async_engine(db_url, echo=echo)
+        import sys
+        from sqlalchemy.pool import NullPool
+        # Use NullPool during testing to avoid asyncio event loop mismatch errors across test files
+        poolclass = NullPool if "pytest" in sys.modules else None
+        self.engine = create_async_engine(db_url, echo=echo, poolclass=poolclass)
         self.session = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
 
     async def create_tables(self):
@@ -553,7 +557,10 @@ class MovieManager:
     """
 
     def __init__(self, db_url: str, echo: bool = False) -> None:
-        self.engine = create_async_engine(db_url, echo=echo)
+        import sys
+        from sqlalchemy.pool import NullPool
+        poolclass = NullPool if "pytest" in sys.modules else None
+        self.engine = create_async_engine(db_url, echo=echo, poolclass=poolclass)
         self.session = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
 
     @staticmethod
@@ -745,8 +752,7 @@ class MovieManager:
                 await session.rollback()
                 raise
 
-    @transaction
-    async def add_movie(self, session: AsyncSession, username: str, query: str) -> bool:
+    async def add_movie(self, username: str, query: str) -> bool:
         """
         Search TMDB for a movie and add it to the user's tracked list.
 
@@ -756,31 +762,41 @@ class MovieManager:
         Raises:
             MovieAlreadyExists: If the movie is already tracked.
             UserNotFoundError:  If the user does not exist.
+            MovieNotFoundError: If TMDB fails or returns no data.
         """
-        stmt = select(User).where(User.username == username)
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-        if not user:
-            raise UserNotFoundError(username)
-
         data = await fetch_tmdb_data(query)
-        is_exist_stmt = select(Movies).where(
-            Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
-        )
-        is_exist_result = await session.execute(is_exist_stmt)
-        is_exist = is_exist_result.scalar_one_or_none()
-        if is_exist:
-            raise MovieAlreadyExists(data.get("title"))  # type:ignore
-        if user and user is not None:
-            movie = Movies(
-                user_id=user.id,
-                tmdb_id=data.get("tmdb_id"),
-                title=data.get("title"),
-                overview=data.get("overview"),
-                genre_ids=data.get("genre_ids"),
-                status="Not yet",
-                vote_average=data.get("vote_average"),
-            )
-            session.add(movie)
-            return True
-        raise UserNotFoundError(username)
+        if not data:
+            raise MovieNotFoundError(query)
+
+        async with self.session() as session:
+            try:
+                stmt = select(User).where(User.username == username)
+                result = await session.execute(stmt)
+                user = result.scalar_one_or_none()
+                if not user:
+                    raise UserNotFoundError(username)
+
+                is_exist_stmt = select(Movies).where(
+                    Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
+                )
+                is_exist_result = await session.execute(is_exist_stmt)
+                is_exist = is_exist_result.scalar_one_or_none()
+                if is_exist:
+                    raise MovieAlreadyExists(data.get("title"))  # type:ignore
+                if user and user is not None:
+                    movie = Movies(
+                        user_id=user.id,
+                        tmdb_id=data.get("tmdb_id"),
+                        title=data.get("title"),
+                        overview=data.get("overview"),
+                        genre_ids=data.get("genre_ids"),
+                        status="Not yet",
+                        vote_average=data.get("vote_average"),
+                    )
+                    session.add(movie)
+                    await session.commit()
+                    return True
+                return False
+            except Exception:
+                await session.rollback()
+                raise

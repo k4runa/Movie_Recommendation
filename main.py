@@ -49,8 +49,8 @@ async def lifespan(app: FastAPI):
 # Application Factory
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="Movie Recommendation API",
-    description="A production-ready RESTful API for tracking personal movie collections and generating genre-based recommendations via TMDB.",
+    title="CineWave API",
+    description="A production-ready, AI-powered movie recommendation system with advanced security hardening.",
     version="1.0.0",
     lifespan=lifespan,
 )

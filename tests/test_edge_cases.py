@@ -136,6 +136,8 @@ class TestHighValueEdgeCases:
 
             @UserManager.transaction
             async def failing_method(self, session):
+                # session.add is synchronous, so we mock it as MagicMock to avoid RuntimeWarning
+                session.add = MagicMock()
                 session.add(MagicMock())
                 raise RuntimeError("Unexpected failure")
 

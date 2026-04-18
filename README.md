@@ -6,9 +6,6 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-0064a5.svg)
 ![Docker](https://img.shields.io/badge/Docker-27.0+-blue.svg)
 ![JWT](https://img.shields.io/badge/JWT-auth-green.svg)
-![API](https://img.shields.io/badge/REST-API-orange.svg)
-![Async](https://img.shields.io/badge/Async-Python-blue.svg)
-![AI](https://img.shields.io/badge/AI-Powered-blue.svg)
 
 CineWave is a high-performance, asynchronous RESTful API built with FastAPI. It allows users to track their personal movie collections and receive AI-powered recommendations based on their watching history. The application also includes a vanilla JavaScript Single Page Application (SPA) frontend.
 
@@ -31,6 +28,17 @@ CineWave is a high-performance, asynchronous RESTful API built with FastAPI. It 
 - **Async HTTP:** httpx
 - **AI Providers:** Google GenAI SDK (`google-genai`), Groq SDK
 - **Deployment:** Docker, Docker Compose
+
+## 🛡️ Production Hardening & Security
+
+CineWave is engineered for production-grade reliability and security, implementing several advanced architectural patterns:
+
+- **Distributed Consistency:** Atomic database transactions (`@transaction`) ensure data integrity even under partial failure.
+- **Race Condition Protection:** Strict PostgreSQL `UniqueConstraint` guards against concurrent duplicate inserts (e.g., rapid-fire button mashing).
+- **Cascading Failure Prevention:** External API calls (TMDB) are decoupled from database transactions and protected by strict `httpx` timeouts (3s), preventing database connection pool exhaustion during external service degradation.
+- **Timing Attack Mitigation:** Authentication is protected against user enumeration via timing attacks. Response times are normalized using dummy hashing for non-existent users.
+- **OOM Prevention:** Genre analytics utilize targeted SQL queries instead of full ORM relationship loading, preventing memory exhaustion for power users.
+- **Idempotent State Machine:** Movie status updates handle state transitions safely, ensuring referential integrity between the main collection and analysis tables.
 
 ## 🚦 Quick Start
 
@@ -68,8 +76,24 @@ Access the frontend by visiting `http://localhost:8000/` in your browser.
 
 ## 🧪 Testing
 
-The project includes a comprehensive test suite using `pytest`.
+The project includes a comprehensive test suite (25+ tests) covering edge cases, race conditions, and adversarial scenarios.
+
+### Run all tests:
 
 ```bash
-python3 -m pytest tests/
+python3 -m pytest tests/ -v
 ```
+
+### Run Adversarial (Chaos) tests:
+
+```bash
+python3 -m pytest tests/test_adversarial.py -v
+```
+
+Tests cover:
+
+- **Concurrency:** Duplicate registration/tracking attempts.
+- **Network Failures:** TMDB timeouts and 5xx errors.
+- **Security:** Timing attacks and Mass Assignment.
+- **Memory:** OOM prevention for large data sets.
+- **Integrity:** Cascading deletes and state divergence.

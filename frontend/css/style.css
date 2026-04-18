@@ -53,6 +53,21 @@ body {
     position: relative;
 }
 
+/* tech overlay */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.05) 50%
+    );
+    background-size: 100% 4px;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.3;
+}
+
 /* Background orbs — disabled, kept for potential future theming */
 .orb {
     display: none !important;
@@ -351,14 +366,18 @@ input:focus {
 }
 
 .movie-card:hover {
-    transform: translateY(-5px) scale(1.02) perspective(1000px) rotateX(2deg) rotateY(-2deg);
-    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 255, 255, 0.05);
+    transform: translateY(-8px) scale(1.02) perspective(1000px) rotateX(1deg) rotateY(-1deg);
+    box-shadow: 
+        0 20px 40px -10px rgba(0, 0, 0, 0.7),
+        0 0 25px rgba(255, 255, 255, 0.04),
+        0 0 40px rgba(255, 255, 255, 0.02);
     z-index: 10;
 }
 
 .movie-card:hover::before {
     opacity: 1;
     animation: spin-angle 2.5s linear infinite;
+    filter: blur(0.5px);
 }
 
 /* Staggered entrance animation for cards */

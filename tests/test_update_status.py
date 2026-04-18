@@ -75,11 +75,11 @@ class TestUpdateStatus:
         session.execute = AsyncMock(return_value=make_execute_result(None))
 
         manager = MovieManager.__new__(MovieManager)
-
+        manager.session = MagicMock()
+        manager.session.return_value.__aenter__.return_value = session
+    
         with pytest.raises(UserNotFoundError):
-            await MovieManager.update_status.__wrapped__(
-                manager, session, "ghost_user", "Watched", "Fight Club"
-            )
+            await manager.update_status("ghost_user", "Watched", "Fight Club")
 
     @pytest.mark.asyncio
     @patch("services.database.fetch_tmdb_data", side_effect=fake_fetch_tmdb_data)
@@ -96,11 +96,11 @@ class TestUpdateStatus:
         )
 
         manager = MovieManager.__new__(MovieManager)
-
+        manager.session = MagicMock()
+        manager.session.return_value.__aenter__.return_value = session
+    
         with pytest.raises(MovieNotFoundError):
-            await MovieManager.update_status.__wrapped__(
-                manager, session, "testuser", "Watched", "Fight Club"
-            )
+            await manager.update_status("testuser", "Watched", "Fight Club")
 
     @pytest.mark.asyncio
     @patch("services.database.fetch_tmdb_data", side_effect=fake_fetch_tmdb_data)
@@ -119,11 +119,11 @@ class TestUpdateStatus:
         )
 
         manager = MovieManager.__new__(MovieManager)
-
+        manager.session = MagicMock()
+        manager.session.return_value.__aenter__.return_value = session
+    
         with pytest.raises(MovieAlreadyExists):
-            await MovieManager.update_status.__wrapped__(
-                manager, session, "testuser", "Watched", "Fight Club"
-            )
+            await manager.update_status("testuser", "Watched", "Fight Club")
 
     @pytest.mark.asyncio
     @patch("services.database.fetch_tmdb_data", side_effect=fake_fetch_tmdb_data)
@@ -143,11 +143,13 @@ class TestUpdateStatus:
         )
 
         manager = MovieManager.__new__(MovieManager)
-
-        result = await MovieManager.update_status.__wrapped__(
-            manager, session, "testuser", "Watched", "Fight Club"
-        )
-
+        manager.session = MagicMock()
+        manager.session.return_value.__aenter__.return_value = session
+        session.commit = AsyncMock()
+    
+        result = await manager.update_status("testuser", "Watched", "Fight Club")
+    
         assert result is True
         assert mock_movie.status == "Watched"
         session.add.assert_called_once()
+        session.commit.assert_called_once()
