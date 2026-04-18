@@ -192,6 +192,31 @@ class AIService:
 
         return {}
 
+    async def chat(self, message: str, context: Optional[str] = None) -> str:
+        """General chat method with full fallback support."""
+        if not self.active:
+            raise Exception("AI Service not active")
+
+        prompt = message
+        if context:
+            prompt = f"Context: {context}\n\nUser Message: {message}"
+
+        # 1. Try Gemini
+        if self.gemini_active:
+            try:
+                return await self._call_gemini(prompt)
+            except Exception as e:
+                logger.warning(f"Gemini chat failed: {e}. Trying Groq...")
+
+        # 2. Try Groq
+        if self.groq_active:
+            try:
+                return await self._call_groq(prompt)
+            except Exception as e:
+                logger.error(f"Groq chat failed: {e}")
+
+        raise Exception("All AI providers exhausted.")
+
     def _parse_explanations(self, text: str) -> Dict[str, str]:
         """Helper to parse 'Title: Reason' format."""
         explanations = {}
