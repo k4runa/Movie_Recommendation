@@ -921,3 +921,38 @@ input:checked + .slider:before {
     box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
 }
 
+/* 11. BACKGROUND PATHS ANIMATION */
+
+#background-paths {
+    z-index: -10;
+    transition: opacity 0.5s ease;
+}
+
+.floating-path {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: pathFlow 20s linear infinite;
+    vector-effect: non-scaling-stroke;
+}
+
+@keyframes pathFlow {
+    0% {
+        stroke-dashoffset: 1000;
+        opacity: 0.1;
+    }
+    50% {
+        opacity: 0.4;
+    }
+    100% {
+        stroke-dashoffset: 0;
+        opacity: 0.1;
+    }
+}
+
+/* Adjust dark/light mode text colors for paths */
+.dark #bg-paths-svg {
+    color: #ffffff;
+}
+#bg-paths-svg {
+    color: #000000;
+}

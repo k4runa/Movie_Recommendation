@@ -10,19 +10,21 @@
     <link rel="stylesheet" href="/ui/css/style.css">
     <link rel="icon" type="image/png" href="/ui/img/favicon.png">
     
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
     <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
-    <!-- Three.js for Background -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
-    <!-- Background orbs (disabled via CSS, kept for potential future use) -->
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    
-    <!-- Three.js Dotted Surface Container -->
-    <div id="canvas-container" class="pointer-events-none fixed inset-0 -z-1" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none;"></div>
+    <!-- 🌊 Background Paths Layer -->
+    <div id="background-paths" class="fixed inset-0 pointer-events-none -z-10 bg-white dark:bg-neutral-950">
+        <svg id="bg-paths-svg" class="w-full h-full text-slate-900 dark:text-white opacity-20" viewBox="0 0 696 316" fill="none" preserveAspectRatio="xMidYMid slice">
+            <title>Background Paths</title>
+            <g id="paths-group-1"></g>
+            <g id="paths-group-2"></g>
+        </svg>
+    </div>
     
     <div class="glass-container">
         

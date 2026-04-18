@@ -1027,103 +1027,50 @@ async function handleUpdatePassword(e) {
 
 // 10. THREE.JS BACKGROUND (Dotted Surface)
 
-function initThreeJSBackground() {
-    const container = document.getElementById('canvas-container');
-    if (!container || typeof THREE === 'undefined') return;
+/**
+ * Initialize the Background Paths effect.
+ * Ported from the React component logic to Vanilla JS for high performance.
+ */
+function initBackgroundPaths() {
+    const group1 = document.getElementById('paths-group-1');
+    const group2 = document.getElementById('paths-group-2');
+    if (!group1 || !group2) return;
 
-    const SEPARATION = 150;
-    const AMOUNTX = 40;
-    const AMOUNTY = 60;
+    function createPaths(container, position) {
+        for (let i = 0; i < 36; i++) {
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            
+            // Bezier curve math from the React component
+            const d = `M-${380 - i * 5 * position} -${189 + i * 6}C-${
+                380 - i * 5 * position
+            } -${189 + i * 6} -${312 - i * 5 * position} ${216 - i * 6} ${
+                152 - i * 5 * position
+            } ${343 - i * 6}C${616 - i * 5 * position} ${470 - i * 6} ${
+                684 - i * 5 * position
+            } ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`;
+            
+            const width = 0.5 + i * 0.03;
+            const opacity = 0.1 + i * 0.03;
+            const duration = 20 + Math.random() * 10;
+            const delay = Math.random() * -20; // Random start offset
 
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0a0a0a, 2000, 10000); // Matches var(--bg-dark)
-
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
-    camera.position.set(0, 355, 1220);
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(scene.fog.color, 0);
-
-    container.appendChild(renderer.domElement);
-
-    const positions = [];
-    const colors = [];
-    const geometry = new THREE.BufferGeometry();
-
-    for (let ix = 0; ix < AMOUNTX; ix++) {
-        for (let iy = 0; iy < AMOUNTY; iy++) {
-            const x = ix * SEPARATION - (AMOUNTX * SEPARATION) / 2;
-            const y = 0;
-            const z = iy * SEPARATION - (AMOUNTY * SEPARATION) / 2;
-
-            positions.push(x, y, z);
-            // Pure neutral gray particles for dark theme
-            colors.push(0.35, 0.35, 0.35);
+            path.setAttribute("d", d);
+            path.setAttribute("stroke", "currentColor");
+            path.setAttribute("stroke-width", width);
+            path.setAttribute("stroke-opacity", opacity);
+            path.setAttribute("fill", "none");
+            path.classList.add("floating-path");
+            
+            // Inline style for individual animation timing
+            path.style.animationDuration = `${duration}s`;
+            path.style.animationDelay = `${delay}s`;
+            
+            container.appendChild(path);
         }
     }
 
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-    const material = new THREE.PointsMaterial({
-        size: 8,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.6,
-        sizeAttenuation: true,
-    });
-
-    const points = new THREE.Points(geometry, material);
-    scene.add(points);
-
-    let count = 0;
-    let mouseX = 0;
-    let mouseY = 0;
-    let windowHalfX = window.innerWidth / 2;
-    let windowHalfY = window.innerHeight / 2;
-
-    document.addEventListener('mousemove', (event) => {
-        mouseX = event.clientX - windowHalfX;
-        mouseY = event.clientY - windowHalfY;
-    });
-
-    function animate() {
-        requestAnimationFrame(animate);
-
-        const positionAttribute = geometry.attributes.position;
-        const posArray = positionAttribute.array;
-
-        let i = 0;
-        for (let ix = 0; ix < AMOUNTX; ix++) {
-            for (let iy = 0; iy < AMOUNTY; iy++) {
-                const index = i * 3;
-                posArray[index + 1] = Math.sin((ix + count) * 0.3) * 50 + Math.sin((iy + count) * 0.5) * 50;
-                i++;
-            }
-        }
-
-        positionAttribute.needsUpdate = true;
-
-        // Interactive Parallax Effect
-        camera.position.x += (mouseX * 0.8 - camera.position.x) * 0.05;
-        camera.position.y += (-mouseY * 0.5 + 355 - camera.position.y) * 0.05;
-        camera.lookAt(scene.position);
-
-        renderer.render(scene, camera);
-        count += 0.1;
-    }
-
-    window.addEventListener('resize', () => {
-        windowHalfX = window.innerWidth / 2;
-        windowHalfY = window.innerHeight / 2;
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    animate();
+    createPaths(group1, 1);
+    createPaths(group2, -1);
 }
 
 
@@ -1173,7 +1120,7 @@ async function syncMaxToasts(val) {
         });
         
         if (!res.ok) throw new Error("Sync failed");
-
+ 
         localStorage.setItem('max_toasts', val);
         showToast(`Max notifications set to ${val}`, "info");
     } catch (err) {
@@ -1187,4 +1134,4 @@ window.adjustToasts = adjustToasts;
 
 // BOOTSTRAP
 init();
-initThreeJSBackground();
+initBackgroundPaths();
