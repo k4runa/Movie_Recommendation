@@ -11,6 +11,7 @@ Run via Docker:
     docker-compose up -d --build
 """
 
+import os
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import RequestValidationError
@@ -48,11 +49,17 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 # Application Factory
 # ---------------------------------------------------------------------------
+# Enable documentation only in DEBUG mode (Security hardening)
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
 app = FastAPI(
     title="CineWave API",
     description="A production-ready, AI-powered movie recommendation system with advanced security hardening.",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs" if DEBUG else None,
+    redoc_url="/redoc" if DEBUG else None,
+    openapi_url="/openapi.json" if DEBUG else None,
 )
 
 # ---------------------------------------------------------------------------
