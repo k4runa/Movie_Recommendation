@@ -433,6 +433,47 @@ function switchTab(targetId) {
 // 4. AUTHENTICATION
 
 /**
+ * Handle username update form submission.
+ * Re-authenticates with current password and updates the username.
+ */
+async function handleUpdateUsername(e) {
+    e.preventDefault();
+    const newUsername = el.inputNewUsername.value.trim();
+    const password = el.inputUsernameVerifyPassword.value;
+    
+    if (!newUsername || !password) return;
+    
+    try {
+        const res = await fetch(`/ui/users/${currentUsername}`, {
+            method: 'PATCH',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentToken}`
+            },
+            body: JSON.stringify({
+                field: 'username',
+                value: newUsername,
+                current_password: password
+            })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Update failed");
+        
+        showToast("Username updated! Logging you in with new name...", "success");
+        
+        // Update local storage and global state
+        localStorage.setItem('username', newUsername);
+        currentUsername = newUsername;
+        
+        // Small delay then reload to refresh all UI states
+        setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+        showToast(err.message, "error");
+    }
+}
+
+/**
  * Handle the auth form submission.
  * In login mode:    POST /login with form-encoded credentials.
  * In register mode: POST /users with JSON body, then auto-login.
