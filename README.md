@@ -6,6 +6,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-0064a5.svg)
 ![Docker](https://img.shields.io/badge/Docker-27.0+-blue.svg)
 ![JWT](https://img.shields.io/badge/JWT-auth-green.svg)
+![Last commit](https://img.shields.io/github/last-commit/k4runa/Movie_Recommendation.svg?style=for-the-badge)
 
 CineWave is a high-performance, asynchronous RESTful API built with FastAPI. It allows users to track their personal movie collections and receive AI-powered recommendations based on their watching history. The application also includes a vanilla JavaScript Single Page Application (SPA) frontend.
 
@@ -22,11 +23,11 @@ CineWave is a high-performance, asynchronous RESTful API built with FastAPI. It 
 ## 🛠 Tech Stack
 
 - **Backend:** FastAPI, Python 3.12+
-- **Database:** PostgreSQL 16
-- **ORM & Migrations:** SQLAlchemy 2.0 (Async), Alembic
+- **Database:** PostgreSQL 16+
+- **ORM & Migrations:** SQLAlchemy 2.0+ (Async), Alembic
 - **Frontend:** Vanilla JS (ES5+), CSS3 (Tailwind Zinc palette inspired)
 - **Async HTTP:** httpx
-- **AI Providers:** Google GenAI SDK (`google-genai`), Groq SDK
+- **AI Providers:** Google GenAI SDK (`google-genai`), Groq SDK (Optional!!!)
 - **Deployment:** Docker, Docker Compose
 
 ## 🛡️ Production Hardening & Security

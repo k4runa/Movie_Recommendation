@@ -136,6 +136,10 @@ const el = {
     formUpdateUsername: document.getElementById('form-update-username'),
     inputNewUsername: document.getElementById('input-new-username'),
     inputUsernameVerifyPassword: document.getElementById('input-username-verify-password'),
+    displayDevice: document.getElementById('display-device'),
+    displayOs: document.getElementById('display-os'),
+    displayMachine: document.getElementById('display-machine'),
+    displayMemory: document.getElementById('display-memory'),
 };
 
 
@@ -906,6 +910,12 @@ async function loadUserSettings() {
             localStorage.setItem('max_toasts', data.max_toasts);
             if (el.inputMaxToasts) el.inputMaxToasts.value = data.max_toasts;
         }
+
+        // Populate System Metadata
+        if (el.displayDevice) el.displayDevice.innerText = data.device || "Unknown";
+        if (el.displayOs) el.displayOs.innerText = data.os || "Unknown";
+        if (el.displayMachine) el.displayMachine.innerText = data.machine || "Unknown";
+        if (el.displayMemory) el.displayMemory.innerText = data.memory || "Unknown";
 
         dataLoaded.settings = true;
     } catch (err) {

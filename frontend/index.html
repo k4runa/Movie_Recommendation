@@ -180,6 +180,35 @@
                                 <button type="button" class="btn-counter" onclick="adjustToasts(1)"><i class="ph ph-plus"></i></button>
                             </div>
                         </div>
+
+                        <div style="height: 1px; background: rgba(255,255,255,0.05); width: 100%;"></div>
+
+                        <div class="settings-item">
+                            <div class="settings-info">
+                                <label>System & Security</label>
+                                <p>Detected device and network environment for this account.</p>
+                                <div style="margin-top: 1rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem;">
+                                    <div class="meta-card" style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                        <small style="color: var(--accent-neon); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; display: block; margin-bottom: 0.2rem;">Device</small>
+                                        <span id="display-device" style="font-size: 0.9rem; opacity: 0.9;">—</span>
+                                    </div>
+                                    <div class="meta-card" style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                        <small style="color: var(--accent-neon); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; display: block; margin-bottom: 0.2rem;">OS</small>
+                                        <span id="display-os" style="font-size: 0.9rem; opacity: 0.9;">—</span>
+                                    </div>
+                                    <div class="meta-card" style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                        <small style="color: var(--accent-neon); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; display: block; margin-bottom: 0.2rem;">Machine</small>
+                                        <span id="display-machine" style="font-size: 0.9rem; opacity: 0.9;">—</span>
+                                    </div>
+                                    <div class="meta-card" style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                                        <small style="color: var(--accent-neon); text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; display: block; margin-bottom: 0.2rem;">Memory</small>
+                                        <span id="display-memory" style="font-size: 0.9rem; opacity: 0.9;">—</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="height: 1px; background: rgba(255,255,255,0.05); width: 100%;"></div>
                     </div>
 
                     <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
