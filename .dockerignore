@@ -1,6 +1,5 @@
 # .dockerignore
 # Files and directories excluded from the Docker build context.
-# Keeps the image lean and prevents secrets from being baked in.
 
 .git
 .env
@@ -9,3 +8,9 @@ __pycache__
 .pytest_cache
 .ruff_cache
 database/
+frontend/
+web/node_modules/
+web/.next/
+web/out/
+venv/
+.venv/

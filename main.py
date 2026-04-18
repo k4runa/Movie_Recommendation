@@ -39,12 +39,34 @@ async def lifespan(app: FastAPI):
     At startup, creates database tables and ensures that at least one
     admin account is seeded.
     """
+    from services.cache import cache_service
+    import asyncio
+    
     logger.info("Application startup: Creating tables and seeding admin...")
     await users_manager.create_tables()
     await users_manager.ensure_admin_exists()  # type: ignore
+    
+    # Start background cache cleaner
+    cache_task = asyncio.create_task(cache_service.clear_expired())
+    
     yield
+    
+    cache_task.cancel()
     logger.info("Application shutdown.")
 
+
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.themoviedb.org https://image.tmdb.org"
+        return response
 
 # ---------------------------------------------------------------------------
 # Application Factory
@@ -61,6 +83,19 @@ app = FastAPI(
     redoc_url="/redoc" if DEBUG else None,
     openapi_url="/openapi.json" if DEBUG else None,
 )
+
+# Parse allowed origins from environment
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ---------------------------------------------------------------------------
 # Router Registration

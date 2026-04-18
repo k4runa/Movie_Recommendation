@@ -1,31 +1,39 @@
-# CineWave API — Dockerfile
-# Multi-purpose container image for the FastAPI application.
-# Includes all Python dependencies, the frontend SPA, and Alembic
-# migration tooling.
-#
-# Build:  docker build -t cinewave-api .
-# Run:    docker run -p 8000:8000 --env-file .env cinewave-api
+# CineWave API — Multi-Stage Dockerfile
+# Builds the Next.js frontend and the FastAPI backend into a single lean image.
 
+# --- Stage 1: Build Frontend ---
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/web
+
+# Install dependencies
+COPY web/package*.json ./
+RUN npm ci
+
+# Copy source and build static files
+COPY web/ ./
+RUN npm run build
+
+# --- Stage 2: Build Backend & Final Image ---
 FROM python:3.12-slim
-
-# Set working directory inside the container
 WORKDIR /app
 
-# Prevent Python from writing .pyc files and enable unbuffered stdout/stderr
-# so that container logs appear in real time.
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install dependencies first (leverages Docker layer caching — only
-# re-installed when requirements.txt changes).
+# Install backend dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source code and frontend assets
+# Copy backend source code
 COPY . .
 
-# Expose the default uvicorn port
+# Copy built frontend static files from Stage 1 into the backend's static directory
+COPY --from=frontend-builder /app/web/out /app/frontend
+
 EXPOSE 8000
 
-# Launch the ASGI server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Ensure the startup script is executable
+RUN chmod +x start.sh
+
+# Start using the custom startup script (runs Alembic then Gunicorn)
+CMD ["./start.sh"]

@@ -29,11 +29,13 @@ router = APIRouter(prefix="/users", tags=["users"])
 # ---------------------------------------------------------------------------
 
 
+from typing import Any
+
 class UpdateUserRequest(BaseModel):
     """Payload for partial user updates — specify field name and new value."""
 
     field: str
-    value: str
+    value: Any
     current_password: str | None = None
 
 

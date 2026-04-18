@@ -11,7 +11,7 @@ the API.  FastAPI uses these for:
     • Auto-generated OpenAPI / Swagger documentation.
 """
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, Field
 from typing import List, Optional
 
 
@@ -30,8 +30,8 @@ class UserScheme(BaseModel):
         - Password is accepted as-is (hashed server-side before storage).
     """
 
-    username: str
-    password: str
+    username: str = Field(..., min_length=4, max_length=50, pattern="^[a-zA-Z0-9_-]+$")
+    password: str = Field(..., max_length=128)
     email: EmailStr
     # Optional hardware metadata from JS
     device: str | None = None
@@ -51,14 +51,8 @@ class UserScheme(BaseModel):
 
 
 class MovieScheme(BaseModel):
-    """
-    Schema for movie search / tracking requests.
-
-    The `query` string is forwarded to the TMDB search API to resolve
-    a movie by title.
-    """
-
-    query: str
+    query: Optional[str] = Field(None, max_length=100)
+    tmdb_id: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +80,6 @@ class UserResponse(BaseModel):
     max_toasts: int
 
 
-
 class MovieResponse(BaseModel):
     """Representation of a tracked movie."""
 
@@ -97,6 +90,8 @@ class MovieResponse(BaseModel):
     genre_ids: str
     status: str
     vote_average: Optional[str] = None
+    poster_url: Optional[str] = None
+    release_date: Optional[str] = None
 
 
 class WatchedMovieResponse(BaseModel):

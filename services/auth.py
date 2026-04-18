@@ -25,6 +25,7 @@ from fastapi import HTTPException, status, Depends
 from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
+from services.cache import cache_service
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -33,12 +34,24 @@ logger = logging.getLogger(__name__)
 # Configuration — sourced from environment variables
 # ---------------------------------------------------------------------------
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ALGORITHM = "HS256" # Hardcoded for security
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "120"))
 
 # FastAPI's OAuth2 scheme — extracts the Bearer token from the
 # Authorization header and feeds it to `get_current_user`.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+# ---------------------------------------------------------------------------
+# Token Blacklisting
+# ---------------------------------------------------------------------------
+async def is_token_blacklisted(token: str) -> bool:
+    """Check if the token has been revoked."""
+    val = await cache_service.get(f"bl_{token}")
+    return val is not None
+
+async def blacklist_token(token: str, expires_in_seconds: int):
+    """Add a token to the blacklist until it naturally expires."""
+    await cache_service.set(f"bl_{token}", "revoked", ttl=expires_in_seconds)
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +136,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if await is_token_blacklisted(token):
+            logger.warning("Attempted use of blacklisted token.")
+            raise credentials_exception
+
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"require": ["exp"]})
         username: str = payload.get("sub")  # type: ignore
         if username:
             token_data = {"username": username}

@@ -1,10 +1,9 @@
 services:
-  # 1. CineWave API Web Service
+  # 1. CineWave Unified App (FastAPI + Next.js)
   - type: web
     name: cinewave-api
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: ./start.sh
+    env: docker
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -18,6 +17,12 @@ services:
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: 120
+      # IMPORTANT: Render provides PostgreSQL connection strings starting with 'postgres://'.
+      # For asyncpg, it must be 'postgresql+asyncpg://'.
+      # For psycopg2, it must be 'postgresql+psycopg2://'.
+      # You MUST manually override DATABASE_URL and DATABASE_URL_SYNC in the Render dashboard
+      # after connecting the database, or add logic in your `main.py` to auto-replace `postgres://` with `postgresql...`.
+
       # User needs to fill these manually in Render Dashboard:
       # - JWT_SECRET_KEY
       # - API_KEY (TMDB)
@@ -29,4 +34,4 @@ databases:
   - name: cinewave-db
     databaseName: cinewave_db
     user: cinewave
-    plan: free # Change to 'standard' for production if needed
+    plan: free

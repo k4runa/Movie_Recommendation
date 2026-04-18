@@ -1,100 +1,104 @@
-# 🎬 CineWave: Movie Recommendation APP
+# 🎬 CineWave: AI-Powered Full-Stack Movie Ecosystem
 
 ![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)
-![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0+-red.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)
+![Next.js](https://img.shields.io/badge/Next.js-15+-black.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-0064a5.svg)
-![Docker](https://img.shields.io/badge/Docker-27.0+-blue.svg)
-![JWT](https://img.shields.io/badge/JWT-auth-green.svg)
-![Last commit](https://img.shields.io/github/last-commit/k4runa/Movie_Recommendation.svg?style=for-the-badge)
+![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED.svg)
 
-CineWave is a high-performance, asynchronous RESTful API built with FastAPI. It allows users to track their personal movie collections and receive AI-powered recommendations based on their watching history. The application also includes a vanilla JavaScript Single Page Application (SPA) frontend.
+CineWave is a high-performance, asynchronous movie tracking and recommendation platform. It features a stunning **Next.js** dashboard with a Glassmorphism design and is powered by **Eco**, a personalized AI assistant that understands your cinematic taste.
+
+The entire application (Frontend + Backend) is seamlessly unified into a single deployment pipeline.
+
+---
 
 ## 🚀 Key Features
 
-- **Fully Asynchronous:** Built on `FastAPI` and `SQLAlchemy (Async)` with `asyncpg` for non-blocking database operations.
-- **User-Controlled AI Features:** Users can dynamically opt-in or opt-out of AI-powered features via the Settings panel. When disabled, the app gracefully falls back to standard genre-based recommendations.
-- **Modern ORM Standards:** Fully compliant with SQLAlchemy 2.0+ utilizing modern `Mapped` and `mapped_column` type hinting.
-- **Dual-AI Fallback:** Powered by the new `Google GenAI SDK` (Primary) and `Groq/Llama-3` (Fallback). If one provider hits a quota limit, the system automatically switches to the alternative.
-- **PostgreSQL Support:** Production-ready database integration managed via `Alembic` migrations.
-- **JWT Authentication:** Secure user management and token-based authentication with role-based access control (Admin/User).
-- **TMDB Integration:** Real-time movie data search and discovery using `httpx`.
+- **Unified Full-Stack Architecture:** The Next.js frontend is statically exported and served directly by the FastAPI backend, eliminating CORS issues and simplifying deployment.
+- **Personalized AI (Eco):** A dedicated AI persona that analyzes your movie library to provide deep insights and explain why certain movies are recommended.
+- **Glassmorphism UI:** A premium, state-of-the-art dashboard built with Next.js, Framer Motion, and Tailwind CSS.
+- **Robust Database Management:** Powered by PostgreSQL and SQLAlchemy 2.0 (Async), with schema versioning strictly managed by **Alembic**.
+- **Multi-Stage Docker Pipeline:** A highly optimized Docker build that securely compiles the Node.js frontend and packages it into a lightweight Python container.
+- **Dual-Layer Caching:** Zustand-based caching on the client and Custom Async TTL Cache on the server protect against API rate limits and optimize CPU load.
 
 ## 🛠 Tech Stack
 
 - **Backend:** FastAPI, Python 3.12+
-- **Database:** PostgreSQL 16+
-- **ORM & Migrations:** SQLAlchemy 2.0+ (Async), Alembic
-- **Frontend:** Vanilla JS (ES5+), CSS3 (Tailwind Zinc palette inspired)
-- **Async HTTP:** httpx
-- **AI Providers:** Google GenAI SDK (`google-genai`), Groq SDK (Optional!!!)
-- **Deployment:** Docker, Docker Compose
+- **Database:** PostgreSQL 16+ (Asyncpg & Psycopg2)
+- **Migrations:** Alembic
+- **Frontend:** Next.js 15, TypeScript, Tailwind CSS, Zustand, Framer Motion
+- **AI Providers:** Google Gemini (Primary), Groq/Llama-3 (Fallback)
 
-## 🛡️ Production Hardening & Security
+---
 
-CineWave is engineered for production-grade reliability and security, implementing several advanced architectural patterns:
+## 🚦 Quick Start (Local Development)
 
-- **Distributed Consistency:** Atomic database transactions (`@transaction`) ensure data integrity even under partial failure.
-- **Race Condition Protection:** Strict PostgreSQL `UniqueConstraint` guards against concurrent duplicate inserts (e.g., rapid-fire button mashing).
-- **Cascading Failure Prevention:** External API calls (TMDB) are decoupled from database transactions and protected by strict `httpx` timeouts (3s), preventing database connection pool exhaustion during external service degradation.
-- **Timing Attack Mitigation:** Authentication is protected against user enumeration via timing attacks. Response times are normalized using dummy hashing for non-existent users.
-- **OOM Prevention:** Genre analytics utilize targeted SQL queries instead of full ORM relationship loading, preventing memory exhaustion for power users.
-- **Idempotent State Machine:** Movie status updates handle state transitions safely, ensuring referential integrity between the main collection and analysis tables.
+### 1. Environment Setup
 
-## 🚦 Quick Start
-
-### 1. Prerequisites
-
-- Docker and Docker Compose installed.
-- TMDB API Key.
-- Gemini and/or Groq API Keys.
-
-### 2. Environment Setup
-
-Rename `.env.example` to `.env` and fill in your credentials:
+Copy the environment template and fill in your API keys (TMDB, Gemini/Groq):
 
 ```bash
 cp .env.example .env
 ```
 
-### 3. Run with Docker
+> **Note:** Set `INITIAL_ADMIN_USERNAME` and `INITIAL_ADMIN_PASSWORD` in your `.env` to automatically seed an admin account upon startup.
+
+### 2. Start the Database
 
 ```bash
+# Start the PostgreSQL database container
+docker-compose up -d cinewave_db
+```
+
+### 3. Run Backend & Migrations
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Apply database migrations
+alembic upgrade head
+
+# Start the API server
+uvicorn main:app --reload
+```
+
+### 4. Run Frontend
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+The API runs on `http://localhost:8000` and the frontend runs on `http://localhost:3000`.
+
+---
+
+## 🐳 Production Deployment (Docker)
+
+CineWave uses a **Multi-Stage Docker Build**. Docker will first compile the Next.js frontend into static files, then copy them into a lightweight Python container. The startup script (`start.sh`) will automatically run Alembic migrations before launching the application.
+
+To deploy the entire stack (Database + Unified API/Frontend):
+
+```bash
+# Build and start the production containers
 docker-compose up -d --build
 ```
 
-### 4. Database Migrations
+Access the live application at: `http://localhost:8000/ui/`
 
-If you are running the project locally outside of Docker, ensure you run migrations:
+---
 
-```bash
-alembic upgrade head
-```
+## 🛡️ Security & Performance Hardening
 
-The API will be available at `http://localhost:8000`.  
-Explore the interactive docs at `http://localhost:8000/docs`.
-Access the frontend by visiting `http://localhost:8000/` in your browser.
+CineWave is engineered for production-grade reliability:
 
-## 🧪 Testing
+- **Server-Side Token Revocation:** JWTs are immediately invalidated upon logout using a server-side async cache blacklist.
+- **Optimized Indices:** Database tables use targeted foreign-key indexing (O(1) lookups) to prevent full-table scans.
+- **Connection Pool Tuning:** Strict connection limits fit within low-memory environments (e.g., 512MB RAM VPS).
+- **Atomic Operations:** Custom `@transaction` decorators ensure that library updates and deletions are always safe and consistent.
 
-The project includes a comprehensive test suite (25+ tests) covering edge cases, race conditions, and adversarial scenarios.
+---
 
-### Run all tests:
-
-```bash
-python3 -m pytest tests/ -v
-```
-
-### Run Adversarial (Chaos) tests:
-
-```bash
-python3 -m pytest tests/test_adversarial.py -v
-```
-
-Tests cover:
-
-- **Concurrency:** Duplicate registration/tracking attempts.
-- **Network Failures:** TMDB timeouts and 5xx errors.
-- **Security:** Timing attacks and Mass Assignment.
-- **Memory:** OOM prevention for large data sets.
-- **Integrity:** Cascading deletes and state divergence.
+_CineWave — Your Cinematic Journey, Optimized._

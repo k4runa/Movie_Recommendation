@@ -12,7 +12,7 @@ Usage in routers:
 """
 
 import os
-from services.database import UserManager, MovieManager
+from services.database import UserManager, MovieManager, init_database
 from dotenv import load_dotenv
 import logging
 
@@ -40,10 +40,15 @@ if not DATABASE_URL:
     raise ValueError("FATAL: DATABASE_URL not found. Please set in .env")
 
 # ---------------------------------------------------------------------------
+# Initialize Shared Engine
+# ---------------------------------------------------------------------------
+init_database(DATABASE_URL)
+
+# ---------------------------------------------------------------------------
 # Singleton Manager Instances
 # ---------------------------------------------------------------------------
 # These are instantiated once at import time and reused for the lifetime
-# of the process.  Each manager creates its own async engine and session factory.
+# of the process. They share the same underlying engine and session pool.
 # ---------------------------------------------------------------------------
-users_manager = UserManager(db_url=DATABASE_URL, echo=False)
-movies_manager = MovieManager(db_url=DATABASE_URL, echo=False)
+users_manager = UserManager()
+movies_manager = MovieManager()

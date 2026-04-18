@@ -35,9 +35,24 @@ import bcrypt
 from datetime import datetime, timezone
 from collections import Counter
 from dotenv import load_dotenv
-from services.schemas import UserScheme
 
 load_dotenv()
+
+# Render.com provides DATABASE_URL as postgres://...
+# SQLAlchemy 2.0+ requires postgresql://... and asyncpg requires postgresql+asyncpg://...
+db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./database/cinewave.db")
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+elif db_url.startswith("postgresql://") and "asyncpg" not in db_url:
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+os.environ["DATABASE_URL"] = db_url
+
+db_url_sync = os.getenv("DATABASE_URL_SYNC", "sqlite:///./database/cinewave.db")
+if db_url_sync.startswith("postgres://"):
+    db_url_sync = db_url_sync.replace("postgres://", "postgresql+psycopg2://", 1)
+elif db_url_sync.startswith("postgresql://") and "psycopg2" not in db_url_sync:
+    db_url_sync = db_url_sync.replace("postgresql://", "postgresql+psycopg2://", 1)
+os.environ["DATABASE_URL_SYNC"] = db_url_sync
 
 # ---------------------------------------------------------------------------
 # Logging Configuration
@@ -56,6 +71,41 @@ class Base(DeclarativeBase):
     """Declarative base class for all ORM models."""
 
     pass
+
+
+# ---------------------------------------------------------------------------
+# Database Configuration & Shared Engine
+# ---------------------------------------------------------------------------
+# We define a single engine and session factory to be shared across all
+# managers. This is critical for performance and memory management.
+# ---------------------------------------------------------------------------
+_engine = None
+_session_maker = None
+
+
+def init_database(db_url: str, echo: bool = False):
+    """Initialize the global engine and session maker."""
+    global _engine, _session_maker
+    import sys
+    from sqlalchemy.pool import NullPool
+
+    # Use NullPool during testing, otherwise use QueuePool with tight limits
+    if "pytest" in sys.modules:
+        poolclass = NullPool
+        _engine = create_async_engine(db_url, echo=echo, poolclass=poolclass)
+    else:
+        _engine = create_async_engine(
+            db_url,
+            echo=echo,
+            pool_size=5,
+            max_overflow=10,
+            pool_recycle=1800,
+            pool_pre_ping=True,
+        )
+
+    _session_maker = async_sessionmaker(
+        _engine, class_=AsyncSession, expire_on_commit=False
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -183,14 +233,18 @@ class Movies(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    tmdb_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    tmdb_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
     overview: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     genre_ids: Mapped[str] = mapped_column(
         String, nullable=False
     )  # Comma-separated TMDB genre IDs
     vote_average: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    poster_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    release_date: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="Not yet")
 
     user: Mapped["User"] = relationship("User", back_populates="movies")
@@ -217,8 +271,12 @@ class WatchedMovies(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    movie_id: Mapped[int] = mapped_column(
+        ForeignKey("movies.id", ondelete="CASCADE"), index=True
+    )
     title: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="Watched")
     watched_at: Mapped[str] = mapped_column(
@@ -254,16 +312,19 @@ class UserManager:
         echo:   If True, SQLAlchemy will log all generated SQL.
     """
 
-    def __init__(self, db_url: str, echo: bool = False):
-        import sys
-        from sqlalchemy.pool import NullPool
+    def __init__(self):
+        """
+        Manager uses the globally initialized engine and session maker.
+        """
+        pass
 
-        # Use NullPool during testing to avoid asyncio event loop mismatch errors across test files
-        poolclass = NullPool if "pytest" in sys.modules else None
-        self.engine = create_async_engine(db_url, echo=echo, poolclass=poolclass)
-        self.session = async_sessionmaker(
-            self.engine, class_=AsyncSession, expire_on_commit=False
-        )
+    @property
+    def engine(self):
+        return _engine
+
+    @property
+    def session(self):
+        return _session_maker
 
     async def create_tables(self):
         """Create all tables in the database (called once at startup)."""
@@ -309,7 +370,13 @@ class UserManager:
             return user is not None
 
     @transaction
-    async def add_user(self, session: AsyncSession, user: UserScheme, user_agent: str = "unknown", ip: str = "unknown") -> bool:
+    async def add_user(
+        self,
+        session: AsyncSession,
+        user: UserScheme,
+        user_agent: str = "unknown",
+        ip: str = "unknown",
+    ) -> bool:
         """
         Register a new user with device and network metadata.
         """
@@ -319,11 +386,16 @@ class UserManager:
         # Basic User-Agent Parsing logic
         ua = user_agent.lower()
         os_name = "Unknown OS"
-        if "windows" in ua: os_name = "Windows"
-        elif "macintosh" in ua or "mac os" in ua: os_name = "macOS"
-        elif "linux" in ua: os_name = "Linux"
-        elif "android" in ua: os_name = "Android"
-        elif "iphone" in ua or "ipad" in ua: os_name = "iOS"
+        if "windows" in ua:
+            os_name = "Windows"
+        elif "macintosh" in ua or "mac os" in ua:
+            os_name = "macOS"
+        elif "linux" in ua:
+            os_name = "Linux"
+        elif "android" in ua:
+            os_name = "Android"
+        elif "iphone" in ua or "ipad" in ua:
+            os_name = "iOS"
 
         device_type = "Desktop"
         if "mobile" in ua or "android" in ua or "iphone" in ua:
@@ -495,7 +567,7 @@ class UserManager:
         session: AsyncSession,
         username: str,
         field: str,
-        value: str,
+        value: Any,
         current_password: Optional[str] = None,
     ) -> bool:
         """
@@ -606,15 +678,19 @@ class MovieManager:
         echo:   If True, SQLAlchemy will log all generated SQL.
     """
 
-    def __init__(self, db_url: str, echo: bool = False) -> None:
-        import sys
-        from sqlalchemy.pool import NullPool
+    def __init__(self):
+        """
+        Manager uses the globally initialized engine and session maker.
+        """
+        pass
 
-        poolclass = NullPool if "pytest" in sys.modules else None
-        self.engine = create_async_engine(db_url, echo=echo, poolclass=poolclass)
-        self.session = async_sessionmaker(
-            self.engine, class_=AsyncSession, expire_on_commit=False
-        )
+    @property
+    def engine(self):
+        return _engine
+
+    @property
+    def session(self):
+        return _session_maker
 
     @staticmethod
     def transaction(func):
@@ -706,6 +782,22 @@ class MovieManager:
         return [
             {c.name: getattr(m, c.name) for c in m.__table__.columns} for m in movies
         ]
+
+    @transaction
+    async def get_all_tracked_tmdb_ids(
+        self, session: AsyncSession, username: str
+    ) -> set[int]:
+        """
+        Return a set of all TMDB IDs tracked by the given user.
+        Used for filtering recommendations.
+        """
+        stmt = (
+            select(Movies.tmdb_id)
+            .join(User, User.id == Movies.user_id)
+            .where(User.username == username)
+        )
+        result = await session.execute(stmt)
+        return set(result.scalars().all())
 
     @transaction
     async def delete_movie(
@@ -805,21 +897,24 @@ class MovieManager:
                 await session.rollback()
                 raise
 
-    async def add_movie(self, username: str, query: str) -> bool:
+    async def add_movie(
+        self, username: str, query: str = None, tmdb_id: int = None
+    ) -> bool:
         """
         Search TMDB for a movie and add it to the user's tracked list.
-
-        The query is forwarded to the TMDB search API; the top result
-        is persisted with its metadata (genres, rating, overview).
-
-        Raises:
-            MovieAlreadyExists: If the movie is already tracked.
-            UserNotFoundError:  If the user does not exist.
-            MovieNotFoundError: If TMDB fails or returns no data.
+        Supports either a search query or a direct TMDB ID.
         """
-        data = await fetch_tmdb_data(query)
+        from services.tmdb import fetch_tmdb_data, fetch_tmdb_movie_by_id
+
+        if tmdb_id:
+            data = await fetch_tmdb_movie_by_id(tmdb_id)
+        elif query:
+            data = await fetch_tmdb_data(query)
+        else:
+            raise ValueError("Either query or tmdb_id must be provided")
+
         if not data:
-            raise MovieNotFoundError(query)
+            raise MovieNotFoundError(query or str(tmdb_id))
 
         async with self.session() as session:
             try:
@@ -845,6 +940,8 @@ class MovieManager:
                         genre_ids=data.get("genre_ids"),
                         status="Not yet",
                         vote_average=data.get("vote_average"),
+                        poster_url=data.get("poster_url"),
+                        release_date=data.get("release_date"),
                     )
                     session.add(movie)
                     await session.commit()

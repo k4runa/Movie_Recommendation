@@ -35,8 +35,6 @@ services:
     container_name: cinewave_api
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app                          # Live-reload during development
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cinewave}:${POSTGRES_PASSWORD:-cinewave_secret}@cinewave_db:5432/${POSTGRES_DB:-cinewave_db}
       - DATABASE_URL_SYNC=postgresql+psycopg2://${POSTGRES_USER:-cinewave}:${POSTGRES_PASSWORD:-cinewave_secret}@cinewave_db:5432/${POSTGRES_DB:-cinewave_db}

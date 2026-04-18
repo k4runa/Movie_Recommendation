@@ -9,7 +9,7 @@ Endpoints:
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from services.auth import verify_password, create_access_token
+from services.auth import verify_password, create_access_token, oauth2_scheme
 from services.database import UserNotFoundError
 from services.deps import users_manager
 
@@ -53,5 +53,31 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         "access_token": access_token,
         "token_type": "bearer",
         "username": user_in_db["username"],
-        "role": user_in_db["role"]
+        "role": user_in_db["role"],
     }
+
+
+@router.post("/logout")
+async def logout(token: str = Depends(oauth2_scheme)):
+    """
+    Invalidate the current user's token by adding it to the server-side blacklist.
+    """
+    from services.auth import blacklist_token, SECRET_KEY, ALGORITHM, oauth2_scheme
+    import jwt
+    from datetime import datetime, timezone
+
+    try:
+        payload = jwt.decode(
+            token, SECRET_KEY, algorithms=[ALGORITHM], options={"require": ["exp"]}
+        )
+        exp = payload.get("exp")
+        if exp:
+            now = datetime.now(timezone.utc).timestamp()
+            ttl = int(exp - now)
+            if ttl > 0:
+                await blacklist_token(token, expires_in_seconds=ttl)
+    except Exception:
+        # If token is invalid or expired, it's essentially already logged out
+        pass
+
+    return {"success": True, "message": "Successfully logged out"}

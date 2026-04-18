@@ -38,9 +38,11 @@ class AIService:
     def __init__(
         self,
         gemini_model: str = "gemini-2.5-flash",
+        gemini_fallback_model: str = "gemini-1.5-flash",
         groq_model: str = "llama-3.3-70b-versatile",
     ):
         self.gemini_model = gemini_model
+        self.gemini_fallback_model = gemini_fallback_model
         self.groq_model = groq_model
 
         # Parse multiple keys
@@ -65,25 +67,51 @@ class AIService:
         if not self.gemini_active:
             raise Exception("Gemini not active")
 
+        import asyncio
+        import random
+
         # Try all available keys starting from the current one
         num_keys = len(self.gemini_keys)
         for _ in range(num_keys):
             key = self.gemini_keys[self.current_gemini_idx]
-            try:
-                client = genai.Client(api_key=key)
-                response = await client.aio.models.generate_content(
-                    model=self.gemini_model, contents=prompt
-                )
-                return response.text.strip()
-            except Exception as e:
-                err_str = str(e).upper()
-                if "429" in err_str or "QUOTA" in err_str or "EXHAUSTED" in err_str:
-                    logger.warning(
-                        f"Gemini Key {self.current_gemini_idx} exhausted. Rotating to next key..."
+            delay = 1.0
+            for attempt in range(3):
+                try:
+                    client = genai.Client(api_key=key)
+                    response = await client.aio.models.generate_content(
+                        model=self.gemini_model, contents=prompt
                     )
-                    self.current_gemini_idx = (self.current_gemini_idx + 1) % num_keys
-                    continue  # Try with next key
-                raise e  # Real error, don't rotate
+                    return response.text.strip()
+                except Exception as e:
+                    err_str = str(e).upper()
+                    
+                    if "429" in err_str or "RATE_LIMIT" in err_str or "TOO_MANY_REQUESTS" in err_str:
+                        if attempt < 2:
+                            sleep_time = min(delay * (2 ** attempt) + random.uniform(0, 0.5), 10.0)
+                            logger.warning(f"Gemini Key {self.current_gemini_idx} rate limited. Retrying in {sleep_time:.2f}s...")
+                            await asyncio.sleep(sleep_time)
+                            continue
+                        else:
+                            break # rotate key after retries exhausted
+                    elif "QUOTA" in err_str or "EXHAUSTED" in err_str:
+                        # Hard quota limit, rotate immediately
+                        break
+                    
+                    # If it's a model not found or invalid model error, try fallback
+                    if "MODEL" in err_str or "NOT_FOUND" in err_str or "INVALID" in err_str:
+                        logger.warning(f"Model {self.gemini_model} failed. Trying fallback {self.gemini_fallback_model}...")
+                        try:
+                            response = await client.aio.models.generate_content(
+                                model=self.gemini_fallback_model, contents=prompt
+                            )
+                            return response.text.strip()
+                        except Exception as fallback_e:
+                            raise fallback_e
+                            
+                    raise e  # Real error, don't rotate
+
+            logger.warning(f"Gemini Key {self.current_gemini_idx} exhausted or failed. Rotating to next key...")
+            self.current_gemini_idx = (self.current_gemini_idx + 1) % num_keys
 
         raise Exception("All Gemini API keys exhausted.")
 
@@ -92,33 +120,45 @@ class AIService:
         if not self.groq_active:
             raise Exception("Groq not active")
 
+        import asyncio
+        import random
+
         num_keys = len(self.groq_keys)
         for _ in range(num_keys):
             key = self.groq_keys[self.current_groq_idx]
-            try:
-                client = AsyncGroq(api_key=key)
-                response = await client.chat.completions.create(
-                    model=self.groq_model,
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=max_tokens,
-                )
-                return response.choices[0].message.content.strip()
-            except Exception as e:
-                err_str = str(e).upper()
-                if "429" in err_str or "RATE_LIMIT" in err_str:
-                    logger.warning(
-                        f"Groq Key {self.current_groq_idx} exhausted. Rotating to next key..."
+            delay = 1.0
+            for attempt in range(3):
+                try:
+                    client = AsyncGroq(api_key=key)
+                    response = await client.chat.completions.create(
+                        model=self.groq_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=max_tokens,
                     )
-                    self.current_groq_idx = (self.current_groq_idx + 1) % num_keys
-                    continue
-                raise e
+                    return response.choices[0].message.content.strip()
+                except Exception as e:
+                    err_str = str(e).upper()
+                    if "429" in err_str or "RATE_LIMIT" in err_str or "TOO_MANY_REQUESTS" in err_str:
+                        if attempt < 2:
+                            sleep_time = min(delay * (2 ** attempt) + random.uniform(0, 0.5), 10.0)
+                            logger.warning(f"Groq Key {self.current_groq_idx} rate limited. Retrying in {sleep_time:.2f}s...")
+                            await asyncio.sleep(sleep_time)
+                            continue
+                        else:
+                            break
+                    elif "QUOTA" in err_str or "EXHAUSTED" in err_str:
+                        break
+                    raise e
+            
+            logger.warning(f"Groq Key {self.current_groq_idx} exhausted. Rotating to next key...")
+            self.current_groq_idx = (self.current_groq_idx + 1) % num_keys
 
         raise Exception("All Groq API keys exhausted.")
 
     async def analyze_user_taste(
         self, watched_movies: List[Dict[str, Any]]
     ) -> Optional[str]:
-        """Generates a summary of the user's movie taste with multi-key rotation."""
+        """Generates a summary of the user's movie taste in English."""
         if not self.active or not watched_movies:
             return None
 
@@ -133,8 +173,10 @@ class AIService:
         {context}
         
         TASK:
+        You are Eco, a professional and insightful cinematic AI assistant for CineWave.
         Write a professional, catchy, and insightful one-paragraph summary (under 60 words) 
         describing their cinematic personality. Refer to them as "You".
+        Everything must be in English.
         """
 
         # 1. Try Gemini (with rotation)
@@ -158,7 +200,7 @@ class AIService:
     async def explain_recommendations(
         self, watched_titles: List[str], recommendations: List[Dict[str, Any]]
     ) -> Dict[str, str]:
-        """Generates a 'Reason why' hook for each recommendation with multi-key rotation."""
+        """Generates a 'Reason why' hook for each recommendation in English."""
         if not self.active or not watched_titles or not recommendations:
             return {}
 
@@ -168,7 +210,9 @@ class AIService:
         Recommendations: {', '.join(rec_titles)}
         
         TASK:
-        For each recommended movie, provide a ONE-SENTENCE explanation why they might like it.
+        You are Eco, the CineWave AI assistant.
+        For each recommended movie, provide a ONE-SENTENCE explanation why the user might like it based on their history.
+        Everything must be in English.
         Format precisely:
         Title: Reason
         Title: Reason
@@ -215,7 +259,8 @@ class AIService:
             except Exception as e:
                 logger.error(f"Groq chat failed: {e}")
 
-        raise Exception("All AI providers exhausted.")
+        # Graceful degradation instead of raising 500
+        return "I'm currently experiencing high demand and cannot process your request right now. Please try again in a few moments."
 
     def _parse_explanations(self, text: str) -> Dict[str, str]:
         """Helper to parse 'Title: Reason' format."""

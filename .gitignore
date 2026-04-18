@@ -1,3 +1,12 @@
+# --- Node.js & Next.js ---
+web/node_modules/
+web/.next/
+web/out/
+web/build/
+web/.env.local
+web/.env.*.local
+frontend/
+
 # --- Python ---
 __pycache__/
 *.py[cod]
@@ -35,9 +44,6 @@ database/*.sqlite3
 .env.test.local
 .env.production.local
 .flaskenv
-
-# --- Docker ---
-.dockeride*
 
 # --- OS ---
 .DS_Store
