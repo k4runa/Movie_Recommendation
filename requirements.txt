@@ -7,7 +7,8 @@
 
 # --- Web Framework ---
 fastapi==0.135.3
-uvicorn==0.44.0
+uvicorn[standard]==0.44.0
+gunicorn==24.0.0
 starlette==1.0.0
 python-multipart==0.0.26
 
