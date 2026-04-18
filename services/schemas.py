@@ -71,12 +71,12 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
-    device: str
-    os: str
-    country: str
-    city: str
+    device: str | None = None
+    os: str | None = None
+    country: str | None = None
+    city: str | None = None
     created_at: str
-    last_seen: str
+    last_seen: str | None = None
     ai_enabled: bool
     max_toasts: int
 
