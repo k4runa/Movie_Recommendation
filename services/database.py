@@ -40,8 +40,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Render.com provides DATABASE_URL as postgres://...
-# SQLAlchemy 2.0+ requires postgresql://... and asyncpg requires postgresql+asyncpg://...
-db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./database/cinewave.db")
+db_url = os.getenv(
+    "DATABASE_URL", "postgresql+asyncpg://cinewave:[EMAIL_ADDRESS]:5432/cinewave_db"
+)
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
 elif db_url.startswith("postgresql://") and "asyncpg" not in db_url:

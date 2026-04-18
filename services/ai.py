@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, AsyncGenerator
 from functools import wraps
 from dotenv import load_dotenv
 
@@ -237,9 +237,17 @@ class AIService:
         return {}
 
     async def chat(self, message: str, context: Optional[str] = None) -> str:
-        """General chat method with full fallback support."""
+        """Wrapper for non-streaming calls."""
+        full_response = ""
+        async for chunk in self.stream_chat(message, context):
+            full_response += chunk
+        return full_response
+
+    async def stream_chat(self, message: str, context: Optional[str] = None) -> AsyncGenerator[str, None]:
+        """General stream chat method with full fallback support."""
         if not self.active:
-            raise Exception("AI Service not active")
+            yield "AI Service not active"
+            return
 
         prompt = message
         if context:
@@ -248,19 +256,55 @@ class AIService:
         # 1. Try Gemini
         if self.gemini_active:
             try:
-                return await self._call_gemini(prompt)
+                async for chunk in self._stream_gemini(prompt):
+                    yield chunk
+                return
             except Exception as e:
-                logger.warning(f"Gemini chat failed: {e}. Trying Groq...")
+                logger.warning(f"Gemini stream failed: {e}. Trying Groq...")
 
         # 2. Try Groq
         if self.groq_active:
             try:
-                return await self._call_groq(prompt)
+                async for chunk in self._stream_groq(prompt):
+                    yield chunk
+                return
             except Exception as e:
-                logger.error(f"Groq chat failed: {e}")
+                logger.error(f"Groq stream failed: {e}")
 
-        # Graceful degradation instead of raising 500
-        return "I'm currently experiencing high demand and cannot process your request right now. Please try again in a few moments."
+        yield "I'm currently experiencing high demand and cannot process your request right now. Please try again in a few moments."
+
+    async def _stream_gemini(self, prompt: str) -> AsyncGenerator[str, None]:
+        """Helper to stream Gemini with key rotation (simplified)."""
+        key = self.gemini_keys[self.current_gemini_idx]
+        try:
+            client = genai.Client(api_key=key)
+            # Use generate_content_stream for streaming
+            async for response in await client.aio.models.generate_content_stream(
+                model=self.gemini_model, contents=prompt
+            ):
+                if response.text:
+                    yield response.text
+        except Exception as e:
+            # If rate limited or quota, we might want to rotate, 
+            # but for streaming it's harder to restart. 
+            # For now, let it fail to the fallback.
+            raise e
+
+    async def _stream_groq(self, prompt: str) -> AsyncGenerator[str, None]:
+        """Helper to stream Groq with key rotation (simplified)."""
+        key = self.groq_keys[self.current_groq_idx]
+        try:
+            client = AsyncGroq(api_key=key)
+            stream = await client.chat.completions.create(
+                model=self.groq_model,
+                messages=[{"role": "user", "content": prompt}],
+                stream=True,
+            )
+            async for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            raise e
 
     def _parse_explanations(self, text: str) -> Dict[str, str]:
         """Helper to parse 'Title: Reason' format."""

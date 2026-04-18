@@ -49,6 +49,17 @@ export const movieApi = {
 export const aiApi = {
   chat: (message: string, history?: { role: string; content: string }[]) =>
     api.post('/ai/chat', { message, history: history || [] }),
+  streamChat: async (message: string, history?: { role: string; content: string }[]) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    return fetch(`${API_BASE_URL}/ai/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ message, history: history || [] }),
+    });
+  },
 };
 
 export default api;
