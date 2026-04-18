@@ -522,6 +522,62 @@ input:focus {
     font-size: 1.1rem;
 }
 
+.input-settings {
+    width: 50px;
+    padding: 0.5rem 0;
+    text-align: center;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    outline: none;
+}
+
+/* Hide native spin buttons */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.counter-control {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.25rem;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+}
+
+.btn-counter {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-counter:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    transform: scale(1.1);
+}
+
+.btn-counter:active {
+    transform: scale(0.9);
+}
+
 
 /* 10. UTILITY CLASSES */
 

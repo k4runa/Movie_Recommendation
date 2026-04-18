@@ -240,10 +240,18 @@ window.showToast = function(message, type = 'success') {
     const container = document.getElementById('toast-container');
     if (!container) return;
 
-    // Apply max toasts limit
+    // Apply max toasts limit strictly
     const maxToasts = parseInt(localStorage.getItem('max_toasts')) || 5;
+    
+    // Force immediate removal of overflowing toasts
     while (container.children.length >= maxToasts) {
-        container.removeChild(container.firstChild);
+        const oldest = container.firstChild;
+        if (oldest) {
+            // Cancel transition to avoid ghost elements during removal
+            oldest.style.transition = 'none';
+            oldest.style.opacity = '0';
+            oldest.remove();
+        }
     }
     
     const toast = document.createElement('div');
@@ -256,11 +264,22 @@ window.showToast = function(message, type = 'success') {
     toast.innerHTML = `<i class="ph ph-${icon}" style="font-size: 1.25rem;"></i> <span>${esc(message)}</span>`;
     container.appendChild(toast);
     
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => {
+    // Small delay to ensure CSS transition triggers
+    requestAnimationFrame(() => {
+        toast.classList.add('show');
+    });
+    
+    // Auto-dismiss after 3 seconds
+    const dismissTimeout = setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 400);
     }, 3000);
+
+    // Allow manual click to dismiss instantly
+    toast.onclick = () => {
+        clearTimeout(dismissTimeout);
+        toast.remove();
+    };
 };
 
 window.showConfirm = function(message) {
@@ -1041,6 +1060,44 @@ function initThreeJSBackground() {
     });
 
     animate();
+}
+
+
+/**
+ * Helper to adjust the max simultaneous toasts setting.
+ * Bound to the custom +/- buttons in the settings panel.
+ * Persists both to localStorage (for instant UI response) and the backend.
+ */
+async function adjustToasts(delta) {
+    const input = document.getElementById('input-max-toasts');
+    if (!input) return;
+    
+    let val = parseInt(input.value) || 5;
+    val += delta;
+    
+    // Enforce range [1, 20]
+    if (val < 1) val = 1;
+    if (val > 20) val = 20;
+    
+    input.value = val;
+    
+    try {
+        // Persist to backend
+        const res = await fetchWithAuth(`/users/${currentUsername}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ field: 'max_toasts', value: val.toString() })
+        });
+        
+        if (!res.ok) throw new Error("Sync failed");
+
+        // Update local state
+        localStorage.setItem('max_toasts', val);
+        showToast(`Max notifications set to ${val}`, "info");
+    } catch (err) {
+        console.error("Failed to sync max_toasts:", err);
+        showToast("Setting updated locally, but failed to sync with cloud.", "error");
+    }
 }
 
 
