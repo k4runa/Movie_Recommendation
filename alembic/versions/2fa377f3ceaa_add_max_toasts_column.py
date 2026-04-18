@@ -24,7 +24,12 @@ def upgrade() -> None:
     op.alter_column('movies', 'user_id',
                existing_type=sa.INTEGER(),
                nullable=False)
-    op.add_column('users', sa.Column('max_toasts', sa.Integer(), server_default='5', nullable=False))
+    # Check if 'max_toasts' column already exists to prevent DuplicateColumn error
+    conn = op.get_bind()
+    inspect_obj = sa.inspect(conn)
+    columns = [c['name'] for c in inspect_obj.get_columns('users')]
+    if 'max_toasts' not in columns:
+        op.add_column('users', sa.Column('max_toasts', sa.Integer(), server_default='5', nullable=False))
     op.alter_column('watched_movies', 'user_id',
                existing_type=sa.INTEGER(),
                nullable=False)
