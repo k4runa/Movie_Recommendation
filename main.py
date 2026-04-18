@@ -26,7 +26,7 @@ from services.database import (
     ReservedUsernameError,
 )
 from services.deps import users_manager
-from routers import auth, users, movies
+from routers import auth, users, movies, ai
 from sqlalchemy.exc import IntegrityError
 
 # ---------------------------------------------------------------------------
@@ -70,6 +70,7 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(movies.router)
+app.include_router(ai.router)
 
 # ---------------------------------------------------------------------------
 # Static Frontend (SPA)
