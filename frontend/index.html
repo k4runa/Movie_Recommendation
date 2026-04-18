@@ -154,7 +154,7 @@
 
                 <!-- Settings Home View -->
                 <div id="settings-home" class="settings-view">
-                    <div class="settings-card" style="margin-top: 2rem;">
+                    <div class="settings-card" style="margin-top: 2rem; display: flex; flex-direction: column; gap: 1.5rem;">
                         <div class="settings-item">
                             <div class="settings-info">
                                 <label for="ai-toggle">AI Discovery Features</label>
@@ -165,14 +165,19 @@
                                 <span class="slider round"></span>
                             </label>
                         </div>
-                    </div>
+
+                        <div style="height: 1px; background: rgba(255,255,255,0.05); width: 100%;"></div>
 
                         <div class="settings-item">
                             <div class="settings-info">
-                                <label for="max-toasts">Max Simultaneous Toasts</label>
+                                <label for="input-max-toasts">Max Simultaneous Toasts</label>
                                 <p>Limit how many notifications appear on screen at once (1-20).</p>
                             </div>
-                            <input type="number" id="input-max-toasts" min="1" max="20" class="input-large" style="width: 80px; text-align: center;">
+                            <div class="counter-control">
+                                <button type="button" class="btn-counter" onclick="adjustToasts(-1)"><i class="ph ph-minus"></i></button>
+                                <input type="number" id="input-max-toasts" min="1" max="20" class="input-settings" value="5" readonly>
+                                <button type="button" class="btn-counter" onclick="adjustToasts(1)"><i class="ph ph-plus"></i></button>
+                            </div>
                         </div>
                     </div>
 

@@ -22,10 +22,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Database URL Resolution
 # ---------------------------------------------------------------------------
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://cinewave:cinewave_secret@localhost:5432/cinewave_db",
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     logger.error("FATAL: DATABASE_URL not found.")
     raise ValueError("FATAL: DATABASE_URL not found. Please set in .env")
