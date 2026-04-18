@@ -30,6 +30,7 @@ from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from fastapi.concurrency import run_in_threadpool
 from functools import wraps
 from typing import List, Optional
+import os
 import logging
 import bcrypt
 from datetime import datetime, timezone
