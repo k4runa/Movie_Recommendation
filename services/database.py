@@ -309,27 +309,32 @@ class UserManager:
             return user is not None
 
     @transaction
-    async def add_user(self, session: AsyncSession, user: UserScheme) -> bool:
+    async def add_user(self, session: AsyncSession, user: UserScheme, user_agent: str = "unknown", ip: str = "unknown") -> bool:
         """
-        Register a new user.
-
-        Collects device and network metadata, hashes the password with
-        bcrypt, and persists the record.
-
-        Raises:
-            UserAlreadyExists: If the username is already taken.
-            ReservedUsernameError: If the username is in the reserved list.
+        Register a new user with device and network metadata.
         """
         if user.username.lower() in RESERVED_USERNAMES:
             raise ReservedUsernameError(user.username)
+
+        # Basic User-Agent Parsing logic
+        ua = user_agent.lower()
+        os_name = "Unknown OS"
+        if "windows" in ua: os_name = "Windows"
+        elif "macintosh" in ua or "mac os" in ua: os_name = "macOS"
+        elif "linux" in ua: os_name = "Linux"
+        elif "android" in ua: os_name = "Android"
+        elif "iphone" in ua or "ipad" in ua: os_name = "iOS"
+
+        device_type = "Desktop"
+        if "mobile" in ua or "android" in ua or "iphone" in ua:
+            device_type = "Mobile"
+        elif "tablet" in ua or "ipad" in ua:
+            device_type = "Tablet"
 
         hashed = await run_in_threadpool(
             bcrypt.hashpw, user.password.encode("utf-8"), bcrypt.gensalt()
         )
         created_at = datetime.now(timezone.utc).isoformat()
-
-        # Registration now always defaults to the 'user' role.
-        # Admins must be seeded via environment variables or promoted by an existing admin.
         assigned_role = "user"
 
         new_user = User(
@@ -337,15 +342,13 @@ class UserManager:
             role=assigned_role,
             password=hashed.decode("utf-8"),
             email=user.email,
-            device="unknown",
-            device_name="unknown",
-            machine="unknown",
-            os="unknown",
-            memory="unknown",
-            hostname="unknown",
-            country="unknown",
-            city="unknown",
-            ip="unknown",
+            device=device_type,
+            os=os_name,
+            ip=ip,
+            device_name=user_agent[:100], # Store start of raw UA as device name
+            machine="Server",
+            country="Pending", # Geolocation could be added later
+            city="Pending",
             ai_enabled=True,
             is_deleted=False,
             created_at=created_at,

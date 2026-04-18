@@ -14,7 +14,7 @@ Endpoints:
     PATCH  /users/{username}   — Update a single field (auth required).
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from services.database import logger
 from services.deps import users_manager
@@ -43,15 +43,24 @@ class UpdateUserRequest(BaseModel):
 
 
 @router.post("")
-async def register(user: UserScheme):
+async def register(user: UserScheme, request: Request):
     """
     Register a new user account.
 
-    This is the only public (unauthenticated) endpoint in the users
-    router.  Device and geolocation metadata is collected automatically
-    at registration time.
+    Automatically collects device (User-Agent) and network (IP) metadata
+    from the request headers for security and analytics.
     """
-    await users_manager.add_user(user)  # type:ignore
+    # Extract metadata from headers
+    user_agent = request.headers.get("User-Agent", "Unknown")
+    
+    # Capture real IP, considering proxies like Render's load balancer
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()
+    else:
+        ip = request.client.host if request.client else "127.0.0.1"
+    
+    await users_manager.add_user(user, user_agent=user_agent, ip=ip) # type:ignore
     return {"success": True, "message": "User successfully added."}
 
 
