@@ -46,6 +46,7 @@ let currentToken = localStorage.getItem('access_token');
 
 /** Authenticated username — used in API paths and UI greeting. */
 let currentUsername = localStorage.getItem('username');
+let currentRole = localStorage.getItem('role');
 
 /** Tracks whether the auth form is in login (true) or register (false) mode. */
 let isLoginMode = true;
@@ -369,7 +370,7 @@ function showDashboard() {
     el.userGreeting.innerText = `Hi, ${currentUsername}`;
     
     // Only the 'admin' user sees the admin panel tab
-    if (currentUsername.toLowerCase() === 'admin') {
+    if (currentRole === 'admin') {
         el.btnAdminTab.classList.remove('hidden');
     } else {
         el.btnAdminTab.classList.add('hidden');
@@ -462,7 +463,7 @@ async function handleAuthSubmit(e) {
             
             if (!res.ok) throw new Error(data.detail || "Login failed");
             
-            saveSession(data.access_token, payload.username);
+            saveSession(data.access_token, data.username, data.role);
             showDashboard();
             
         } else {
@@ -493,21 +494,26 @@ async function handleAuthSubmit(e) {
  * Persist session credentials to localStorage.
  * @param {string} token    — JWT access token.
  * @param {string} username — Authenticated username.
+ * @param {string} role     — User role.
  */
-function saveSession(token, username) {
+function saveSession(token, username, role) {
     localStorage.setItem('access_token', token);
     localStorage.setItem('username', username);
+    localStorage.setItem('role', role);
     currentToken = token;
     currentUsername = username;
+    currentRole = role;
 }
 
 /** Clear session data and return to the auth screen. */
 function logout() {
     localStorage.removeItem('access_token');
     localStorage.removeItem('username');
+    localStorage.removeItem('role');
     localStorage.removeItem('max_toasts');
     currentToken = null;
     currentUsername = null;
+    currentRole = null;
     el.authForm.reset();
     showAuth();
 }
