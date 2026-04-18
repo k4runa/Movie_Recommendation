@@ -12,7 +12,7 @@ Usage in routers:
 """
 
 import os
-from services.database import UserManager, MovieManager, init_database
+from .database import UserManager, MovieManager, init_database
 from dotenv import load_dotenv
 import logging
 
@@ -23,17 +23,20 @@ load_dotenv()
 # Database URL Resolution
 # ---------------------------------------------------------------------------
 def get_sanitized_url(env_key: str, driver: str) -> str:
-    url = os.getenv(env_key)
+    url                 =       os.getenv(env_key)
+    
     if not url:
         return ""
     # Render and others provide postgres://, but SQLAlchemy needs postgresql+driver://
     if url.startswith("postgres://"):
-        url = url.replace("postgres://", f"postgresql+{driver}://", 1)
+        url             =       url.replace("postgres://", f"postgresql+{driver}://", 1)
+    
     elif url.startswith("postgresql://") and f"+{driver}" not in url:
-        url = url.replace("postgresql://", f"postgresql+{driver}://", 1)
+        url             =       url.replace("postgresql://", f"postgresql+{driver}://", 1)
+    
     return url
 
-DATABASE_URL = get_sanitized_url("DATABASE_URL", "asyncpg")
+DATABASE_URL            =       get_sanitized_url("DATABASE_URL", "asyncpg")
 
 if not DATABASE_URL:
     logger.error("FATAL: DATABASE_URL not found.")

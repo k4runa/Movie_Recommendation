@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 class AsyncCache:
     """
     Simple In-Memory TTL Cache for Async operations.
-    Perfect for 512MB RAM environments where Redis might be overkill.
+    Perfect for even 512MB RAM environments where Redis might be overkill.
     """
     def __init__(self):
         self._cache: Dict[str, Dict[str, Any]] = {}

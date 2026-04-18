@@ -30,29 +30,29 @@ class UserScheme(BaseModel):
         - Password is accepted as-is (hashed server-side before storage).
     """
 
-    username: str = Field(..., min_length=4, max_length=50, pattern="^[a-zA-Z0-9_-]+$")
-    password: str = Field(..., max_length=128)
-    email: EmailStr
+    username:       str         =   Field(..., min_length=4, max_length=50, pattern="^[a-zA-Z0-9_-]+$")
+    password:       str         =   Field(..., max_length=128)
+    email:          EmailStr
     # Optional hardware metadata from JS
-    device: str | None = None
-    os: str | None = None
-    machine: str | None = None
-    memory: str | None = None
+    device:         str | None  =   None
+    os:             str | None  =   None
+    machine:        str | None  =   None
+    memory:         str | None  =   None
 
     @field_validator("username")
     @classmethod
     def is_valid_username(cls, v):
         if len(v) < 4:
             raise ValueError("Username must be longer than 4 characters.")
-        forbidden = set("@-.!'?*)(/{}%+^&")
+        forbidden               =   set("@-.!'?*)(/{}%+^&")
         if forbidden & set(v):
             raise ValueError("Username shouldn't have any special characters.")
         return v
 
 
 class MovieScheme(BaseModel):
-    query: Optional[str] = Field(None, max_length=100)
-    tmdb_id: Optional[int] = None
+    query:      str | None  = Field(None, max_length=100)
+    tmdb_id:    str | int   = 0
 
 
 # ---------------------------------------------------------------------------
@@ -67,15 +67,15 @@ class MovieScheme(BaseModel):
 class UserResponse(BaseModel):
     """Public-safe representation of a user record."""
 
-    id: int
-    username: str
-    email: str
-    device: str | None = None
-    os: str | None = None
-    country: str | None = None
-    city: str | None = None
+    id:         int
+    username:   str
+    email:      str
+    device:     str | None = None
+    os:         str | None = None
+    country:    str | None = None
+    city:       str | None = None
     created_at: str
-    last_seen: str | None = None
+    last_seen:  str | None = None
     ai_enabled: bool
     max_toasts: int
 
@@ -83,23 +83,23 @@ class UserResponse(BaseModel):
 class MovieResponse(BaseModel):
     """Representation of a tracked movie."""
 
-    id: int
-    tmdb_id: int
-    title: str
-    overview: Optional[str] = None
-    genre_ids: str
-    status: str
-    vote_average: Optional[str] = None
-    poster_url: Optional[str] = None
-    release_date: Optional[str] = None
+    id:             int
+    tmdb_id:        int
+    title:          str
+    overview:       str | None = None
+    genre_ids:      str
+    status:         str
+    vote_average:   str | None = None
+    poster_url:     str | None = None
+    release_date:   str | None = None
 
 
 class WatchedMovieResponse(BaseModel):
     """Representation of a movie marked as 'Watched'."""
 
-    id: int
-    title: str
-    status: str
+    id:         int
+    title:      str
+    status:     str
     watched_at: str
 
 
@@ -115,19 +115,19 @@ class WatchedMovieResponse(BaseModel):
 class APIResponseUser(BaseModel):
     """Envelope for a single user record."""
 
-    success: bool
-    data: dict[str, UserResponse]
+    success:        bool
+    data:           dict[str, UserResponse]
 
 
 class APIResponseUsersList(BaseModel):
     """Envelope for a paginated list of users."""
 
-    success: bool
-    data: dict[str, List[UserResponse]]
+    success:        bool
+    data:           dict[str, List[UserResponse]]
 
 
 class APIResponseWatchedMoviesList(BaseModel):
     """Envelope for a paginated list of tracked movies."""
 
-    success: bool
-    data: dict[str, List[MovieResponse]]
+    success:        bool
+    data:           dict[str, List[MovieResponse]]

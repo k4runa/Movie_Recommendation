@@ -16,7 +16,6 @@ Design decisions:
 
 from services.tmdb import fetch_tmdb_data
 from sqlalchemy import (
-    Column,
     ForeignKey,
     String,
     Integer,
@@ -29,13 +28,14 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from fastapi.concurrency import run_in_threadpool
 from functools import wraps
-from typing import List, Optional
+from typing import List, Optional, Any
 import os
 import logging
 import bcrypt
 from datetime import datetime, timezone
 from collections import Counter
 from dotenv import load_dotenv
+from .schemas import *
 
 load_dotenv()
 
@@ -129,7 +129,9 @@ class ReservedUsernameError(Exception):
     """Raised when attempting to register a restricted username (e.g. admin)."""
 
     def __init__(self, username: str, *args: object) -> None:
-        super().__init__(f"Username {username} is reserved and cannot be registered.")
+        super().__init__(
+            f"Username {username} is reserved and cannot be registered - args=({args})"
+        )
 
 
 class UserNotFoundError(Exception):
@@ -199,7 +201,7 @@ class User(Base):
         Boolean, nullable=False, default=True, server_default="true"
     )
     max_toasts: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=5, server_default="5"
+        Integer, nullable=False, default=5, server_default="3"
     )
 
     # --- Account lifecycle ---
@@ -330,8 +332,9 @@ class UserManager:
 
     async def create_tables(self):
         """Create all tables in the database (called once at startup)."""
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        if self.engine:
+            async with self.engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
 
     # --- Decorators ---
 
@@ -365,11 +368,13 @@ class UserManager:
 
     async def user_exists(self, username: str) -> bool:
         """Check whether a user with the given username exists (non-deleted)."""
-        async with self.session() as session:
-            stmt = select(User).where(User.username == username)
-            result = await session.execute(stmt)
-            user = result.scalar_one_or_none()
-            return user is not None
+        if self.session:
+            async with self.session() as session:
+                stmt = select(User).where(User.username == username)
+                result = await session.execute(stmt)
+                user = result.scalar_one_or_none()
+                return user is not None
+        return False
 
     @transaction
     async def add_user(
@@ -388,20 +393,27 @@ class UserManager:
         # Basic User-Agent Parsing logic
         ua = user_agent.lower()
         os_name = "Unknown OS"
+
         if "windows" in ua:
             os_name = "Windows"
+
         elif "macintosh" in ua or "mac os" in ua:
             os_name = "macOS"
+
         elif "linux" in ua:
             os_name = "Linux"
+
         elif "android" in ua:
             os_name = "Android"
+
         elif "iphone" in ua or "ipad" in ua:
-            os_name = "iOS"
+            os_name = "IOS"
 
         device_type = "Desktop"
+
         if "mobile" in ua or "android" in ua or "iphone" in ua:
             device_type = "Mobile"
+
         elif "tablet" in ua or "ipad" in ua:
             device_type = "Tablet"
 
@@ -452,10 +464,13 @@ class UserManager:
         stmt = select(User).where(User.username == username)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
+
         if not user:
             raise UserNotFoundError(username)
+
         if hasattr(user, "is_deleted"):
             setattr(user, "is_deleted", True)
+
         logger.info(f"Deleted user: {user.username}")
         return True
 
@@ -464,8 +479,6 @@ class UserManager:
         """
         Ensures at least one admin exists in the system.
         """
-        import os
-
         username = os.getenv("INITIAL_ADMIN_USERNAME")
         password = os.getenv("INITIAL_ADMIN_PASSWORD")
         email = os.getenv("INITIAL_ADMIN_EMAIL")
@@ -479,6 +492,7 @@ class UserManager:
         # Check by USERNAME instead of just role to prevent UniqueViolation errors
         stmt = select(User).where(User.username == username)
         result = await session.execute(stmt)
+
         if result.scalar_one_or_none():
             logger.info(f"Admin seed: User '{username}' already exists. Skipping.")
             return
@@ -570,7 +584,7 @@ class UserManager:
         username: str,
         field: str,
         value: Any,
-        current_password: Optional[str] = None,
+        current_password: str | None = None,
     ) -> bool:
         """
         Update a single field on a user record.
@@ -585,6 +599,7 @@ class UserManager:
         stmt = select(User).where(User.username == username)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
+
         if not user:
             raise UserNotFoundError(username)
 
@@ -648,8 +663,10 @@ class UserManager:
                 val = int(value)
                 if val < 1 or val > 20:
                     raise ValueError("Max toasts must be between 1 and 20.")
+
                 setattr(user, "max_toasts", val)
                 return True
+
             except (TypeError, ValueError):
                 raise ValueError("Invalid value for max_toasts. Must be a number.")
 
@@ -731,24 +748,32 @@ class MovieManager:
             List of up to 5 integer genre IDs, sorted by frequency
             (most common first).  Empty list if the user has no movies.
         """
-        async with self.session() as session:
-            stmt = (
-                select(Movies.genre_ids)
-                .join(User, User.id == Movies.user_id)
-                .where(User.username == username)
-            )
-            result = await session.execute(stmt)
-            genre_rows = result.scalars().all()
+        if self.session:
+            async with self.session() as session:
+                stmt = (
+                    select(Movies.genre_ids)
+                    .join(User, User.id == Movies.user_id)
+                    .where(User.username == username)
+                )
+                result = await session.execute(stmt)
+                genre_rows = result.scalars().all()
 
-        genre_ids = ",".join(genre_rows)
-        genre_ids = genre_ids.strip(",")
-        if not genre_ids or genre_ids is None:
-            logger.info(f"User {username} hasn't rated/watched enough categories yet.")
-            return []
-        ids = [int(i) for i in genre_ids.split(",")]
-        count = Counter(ids)
-        top_genres = [item for item, _ in count.most_common(5)]
-        return top_genres
+            genre_ids = ",".join(genre_rows)
+            genre_ids = genre_ids.strip(",")
+
+            if not genre_ids or genre_ids is None:
+                logger.info(
+                    f"User {username} hasn't rated/watched enough categories yet."
+                )
+                return []
+
+            ids = [int(i) for i in genre_ids.split(",")]
+            count = Counter(ids)
+            top_genres = [item for item, _ in count.most_common(5)]
+
+            return top_genres
+
+        return []
 
     @transaction
     async def get_watched_movies(
@@ -772,6 +797,7 @@ class MovieManager:
         user_stmt = select(User.id).where(User.username == username)
         user_result = await session.execute(user_stmt)
         user_row = user_result.scalar_one_or_none()
+
         if user_row is None:
             raise UserNotFoundError(username)
 
@@ -781,6 +807,7 @@ class MovieManager:
         )
         movies_result = await session.execute(movies_stmt)
         movies = movies_result.scalars().all()
+
         return [
             {c.name: getattr(m, c.name) for c in m.__table__.columns} for m in movies
         ]
@@ -799,6 +826,7 @@ class MovieManager:
             .where(User.username == username)
         )
         result = await session.execute(stmt)
+
         return set(result.scalars().all())
 
     @transaction
@@ -817,6 +845,7 @@ class MovieManager:
         stmt = select(User).where(User.username == username)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
+
         if not user:
             raise UserNotFoundError(username)
 
@@ -825,11 +854,14 @@ class MovieManager:
         )
         movie_result = await session.execute(movie_stmt)
         movie = movie_result.scalar_one_or_none()
+
         if not movie:
             raise MovieNotFoundError(str(movie_id))
 
         await session.delete(movie)
+
         logger.info(f"Deleted movie: {movie.title} (id={movie_id}) - {user.username}")
+
         return True
 
     async def update_status(self, username: str, status: str, query: str) -> bool:
@@ -846,62 +878,68 @@ class MovieManager:
         data = await fetch_tmdb_data(query)
         if not data:
             raise MovieNotFoundError(query)
+        if self.session:
+            async with self.session() as session:
+                try:
+                    stmt = select(User).where(User.username == username)
+                    result = await session.execute(stmt)
+                    user = result.scalar_one_or_none()
+                    if not user:
+                        raise UserNotFoundError(username)
 
-        async with self.session() as session:
-            try:
-                stmt = select(User).where(User.username == username)
-                result = await session.execute(stmt)
-                user = result.scalar_one_or_none()
-                if not user:
-                    raise UserNotFoundError(username)
-
-                movie_stmt = select(Movies).where(
-                    Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
-                )
-                movie_result = await session.execute(movie_stmt)
-                movie = movie_result.scalar_one_or_none()
-                if not movie:
-                    raise MovieNotFoundError(data.get("title", query))
-
-                # Update status on the tracked movie
-                movie.status = status
-
-                if status == "Watched":
-                    # Check if already marked as watched
-                    already_watched_stmt = select(WatchedMovies).where(
-                        WatchedMovies.user_id == user.id,
-                        WatchedMovies.movie_id == movie.id,
+                    movie_stmt = select(Movies).where(
+                        Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
                     )
-                    already_watched_result = await session.execute(already_watched_stmt)
-                    if already_watched_result.scalar_one_or_none():
-                        raise MovieAlreadyExists(movie.title)
+                    movie_result = await session.execute(movie_stmt)
+                    movie = movie_result.scalar_one_or_none()
+                    if not movie:
+                        raise MovieNotFoundError(data.get("title", query))
 
-                    watched_entry = WatchedMovies(
-                        user_id=user.id,
-                        movie_id=movie.id,
-                        title=movie.title,
-                        status=status,
-                        watched_at=datetime.now(timezone.utc).isoformat(),
-                    )
-                    session.add(watched_entry)
-                else:
-                    # If changed from Watched to something else, remove from WatchedMovies
-                    await session.execute(
-                        delete(WatchedMovies).where(
+                    # Update status on the tracked movie
+                    movie.status = status
+
+                    if status == "Watched":
+                        # Check if already marked as watched
+                        already_watched_stmt = select(WatchedMovies).where(
                             WatchedMovies.user_id == user.id,
                             WatchedMovies.movie_id == movie.id,
                         )
-                    )
+                        already_watched_result = await session.execute(
+                            already_watched_stmt
+                        )
 
-                await session.commit()
-                return True
-            except Exception:
-                await session.rollback()
-                raise
+                        if already_watched_result.scalar_one_or_none():
+                            raise MovieAlreadyExists(movie.title)
 
-    async def add_movie(
-        self, username: str, query: str = None, tmdb_id: int = None
-    ) -> bool:
+                        watched_entry = WatchedMovies(
+                            user_id=user.id,
+                            movie_id=movie.id,
+                            title=movie.title,
+                            status=status,
+                            watched_at=datetime.now(timezone.utc).isoformat(),
+                        )
+
+                        session.add(watched_entry)
+
+                    else:
+                        # If changed from Watched to something else, remove from WatchedMovies
+                        await session.execute(
+                            delete(WatchedMovies).where(
+                                WatchedMovies.user_id == user.id,
+                                WatchedMovies.movie_id == movie.id,
+                            )
+                        )
+                    await session.commit()
+
+                    return True
+
+                except Exception:
+                    await session.rollback()
+                    raise
+
+        return False
+
+    async def add_movie(self, username: str, query: str, tmdb_id: int = 0) -> bool:
         """
         Search TMDB for a movie and add it to the user's tracked list.
         Supports either a search query or a direct TMDB ID.
@@ -918,37 +956,47 @@ class MovieManager:
         if not data:
             raise MovieNotFoundError(query or str(tmdb_id))
 
-        async with self.session() as session:
-            try:
-                stmt = select(User).where(User.username == username)
-                result = await session.execute(stmt)
-                user = result.scalar_one_or_none()
-                if not user:
-                    raise UserNotFoundError(username)
+        if self.session:
+            async with self.session() as session:
+                try:
+                    stmt = select(User).where(User.username == username)
+                    result = await session.execute(stmt)
+                    user = result.scalar_one_or_none()
 
-                is_exist_stmt = select(Movies).where(
-                    Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
-                )
-                is_exist_result = await session.execute(is_exist_stmt)
-                is_exist = is_exist_result.scalar_one_or_none()
-                if is_exist:
-                    raise MovieAlreadyExists(data.get("title"))  # type:ignore
-                if user and user is not None:
-                    movie = Movies(
-                        user_id=user.id,
-                        tmdb_id=data.get("tmdb_id"),
-                        title=data.get("title"),
-                        overview=data.get("overview"),
-                        genre_ids=data.get("genre_ids"),
-                        status="Not yet",
-                        vote_average=data.get("vote_average"),
-                        poster_url=data.get("poster_url"),
-                        release_date=data.get("release_date"),
+                    if not user:
+                        raise UserNotFoundError(username)
+
+                    is_exist_stmt = select(Movies).where(
+                        Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id")
                     )
-                    session.add(movie)
-                    await session.commit()
-                    return True
-                return False
-            except Exception:
-                await session.rollback()
-                raise
+                    is_exist_result = await session.execute(is_exist_stmt)
+                    is_exist = is_exist_result.scalar_one_or_none()
+
+                    if is_exist:
+                        raise MovieAlreadyExists(data.get("title"))  # type:ignore
+
+                    if user and user is not None:
+                        movie = Movies(
+                            user_id=user.id,
+                            tmdb_id=data.get("tmdb_id"),
+                            title=data.get("title"),
+                            overview=data.get("overview"),
+                            genre_ids=data.get("genre_ids"),
+                            status="Not yet",
+                            vote_average=data.get("vote_average"),
+                            poster_url=data.get("poster_url"),
+                            release_date=data.get("release_date"),
+                        )
+
+                        session.add(movie)
+                        await session.commit()
+
+                        return True
+
+                    return False
+
+                except Exception:
+                    await session.rollback()
+                    raise
+
+        return False

@@ -12,11 +12,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from services.auth import verify_password, create_access_token, oauth2_scheme
 from services.database import UserNotFoundError
 from services.deps import users_manager
+import bcrypt
+from services.auth import blacklist_token, SECRET_KEY, ALGORITHM, oauth2_scheme
+import jwt
+from datetime import datetime, timezone
+
 
 router = APIRouter(tags=["auth"])
-
-
-import bcrypt
 
 # Pre-computed dummy hash to prevent timing attacks
 DUMMY_HASH = bcrypt.hashpw(b"dummy_password", bcrypt.gensalt()).decode("utf-8")
@@ -35,26 +37,22 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
                            is incorrect.  The error message is intentionally
                            vague to prevent user enumeration.
     """
-    user_in_db = None
+    user_in_db              =   None
     try:
-        user_in_db = await users_manager.get_user_by_username(form_data.username)  # type: ignore
+        user_in_db          =   await users_manager.get_user_by_username(form_data.username)  # type: ignore
     except UserNotFoundError:
         pass
 
     # Normalize response time to prevent User Enumeration via Timing Attacks
-    hashed = user_in_db.get("password", "") if user_in_db else DUMMY_HASH
-    is_valid = await verify_password(form_data.password, hashed)
+    hashed                  =   user_in_db.get("password", "") if user_in_db else DUMMY_HASH
+    is_valid                =   await verify_password(form_data.password, hashed)
 
     if not user_in_db or not is_valid:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
 
-    access_token = create_access_token(data={"sub": user_in_db["username"]})
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "username": user_in_db["username"],
-        "role": user_in_db["role"],
-    }
+    access_token            =   create_access_token(data={"sub": user_in_db["username"]})
+    
+    return {"access_token": access_token,"token_type": "bearer","username": user_in_db["username"],"role": user_in_db["role"],}
 
 
 @router.post("/logout")
@@ -62,20 +60,19 @@ async def logout(token: str = Depends(oauth2_scheme)):
     """
     Invalidate the current user's token by adding it to the server-side blacklist.
     """
-    from services.auth import blacklist_token, SECRET_KEY, ALGORITHM, oauth2_scheme
-    import jwt
-    from datetime import datetime, timezone
-
     try:
-        payload = jwt.decode(
-            token, SECRET_KEY, algorithms=[ALGORITHM], options={"require": ["exp"]}
-        )
-        exp = payload.get("exp")
-        if exp:
-            now = datetime.now(timezone.utc).timestamp()
-            ttl = int(exp - now)
-            if ttl > 0:
-                await blacklist_token(token, expires_in_seconds=ttl)
+        if SECRET_KEY:
+            payload         =   jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"require": ["exp"]})
+            exp             =   payload.get("exp")
+            if exp:
+                now         =   datetime.now(timezone.utc).timestamp()
+                ttl         =   int(exp - now)
+                
+                if ttl > 0:
+                    await blacklist_token(token, expires_in_seconds=ttl)
+        else:
+            print(f"ERROR: SECRET_KEY IS NOT SET. PLEASE SET IN '.env'")
+            return 
     except Exception:
         # If token is invalid or expired, it's essentially already logged out
         pass

@@ -28,7 +28,10 @@ from services.database import (
 from services.deps import users_manager
 from routers import auth, users, movies, ai
 from sqlalchemy.exc import IntegrityError
-
+from services.cache import cache_service
+import asyncio
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 # ---------------------------------------------------------------------------
 # Lifespan Management
 # ---------------------------------------------------------------------------
@@ -38,26 +41,18 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events.
     At startup, creates database tables and ensures that at least one
     admin account is seeded.
-    """
-    from services.cache import cache_service
-    import asyncio
-    
+    """    
     logger.info("Application startup: Creating tables and seeding admin...")
     await users_manager.create_tables()
     await users_manager.ensure_admin_exists()  # type: ignore
-    
     # Start background cache cleaner
     cache_task = asyncio.create_task(cache_service.clear_expired())
-    
     yield
-    
     cache_task.cancel()
     logger.info("Application shutdown.")
 
 
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
