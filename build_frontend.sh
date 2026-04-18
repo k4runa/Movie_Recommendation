@@ -13,6 +13,7 @@ npm run build
 # 2. Clear old frontend files in the root if they exist
 # We'll keep the 'frontend' folder as the target for FastAPI
 cd ..
+mkdir -p frontend
 rm -rf frontend/*
 
 # 3. Copy Next.js static output to the 'frontend' folder
