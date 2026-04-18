@@ -4,6 +4,6 @@
 echo "Running database migrations..."
 alembic upgrade head
 
-# 2. Uygulamayı Gunicorn ile başlat (Üretim seviyesi performans için)
+# 2. Uygulamayı Gunicorn ile başlat (Hafıza dostu ayarlar)
 echo "Starting CineWave API..."
-exec gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:${PORT:-8000}
+exec gunicorn -w ${WEB_CONCURRENCY:-2} -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:${PORT:-8000}

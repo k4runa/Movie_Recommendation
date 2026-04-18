@@ -47,9 +47,6 @@ logging.basicConfig(level=logging.INFO, format=format)
 logger = logging.getLogger(__name__)
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # SQLAlchemy Base
 # ---------------------------------------------------------------------------
@@ -126,7 +123,9 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    role: Mapped[str] = mapped_column(String, nullable=False, default="user", server_default="user")
+    role: Mapped[str] = mapped_column(
+        String, nullable=False, default="user", server_default="user"
+    )
     password: Mapped[str] = mapped_column(String, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
 
@@ -144,8 +143,12 @@ class User(Base):
     ip: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # --- Account settings ---
-    ai_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
-    max_toasts: Mapped[int] = mapped_column(Integer, nullable=False, default=5, server_default="5")
+    ai_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    max_toasts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=5, server_default="5"
+    )
 
     # --- Account lifecycle ---
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -156,7 +159,9 @@ class User(Base):
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
 
-    movies: Mapped[List["Movies"]] = relationship("Movies", back_populates="user", lazy="selectin")
+    movies: Mapped[List["Movies"]] = relationship(
+        "Movies", back_populates="user", lazy="selectin"
+    )
 
 
 class Movies(Base):
@@ -173,19 +178,28 @@ class Movies(Base):
     """
 
     __tablename__ = "movies"
-    __table_args__ = (UniqueConstraint("user_id", "tmdb_id", name="uq_user_tmdb_movie"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "tmdb_id", name="uq_user_tmdb_movie"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     tmdb_id: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
     overview: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    genre_ids: Mapped[str] = mapped_column(String, nullable=False)  # Comma-separated TMDB genre IDs
+    genre_ids: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # Comma-separated TMDB genre IDs
     vote_average: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="Not yet")
 
     user: Mapped["User"] = relationship("User", back_populates="movies")
-    watched_movies: Mapped[List["WatchedMovies"]] = relationship("WatchedMovies", back_populates="who_watched", lazy="selectin", cascade="all, delete-orphan")
+    watched_movies: Mapped[List["WatchedMovies"]] = relationship(
+        "WatchedMovies",
+        back_populates="who_watched",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
 
 
 class WatchedMovies(Base):
@@ -198,7 +212,9 @@ class WatchedMovies(Base):
     """
 
     __tablename__ = "watched_movies"
-    __table_args__ = (UniqueConstraint("user_id", "movie_id", name="uq_user_watched_movie"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="uq_user_watched_movie"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
@@ -209,7 +225,9 @@ class WatchedMovies(Base):
         String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat()
     )
 
-    who_watched: Mapped["Movies"] = relationship("Movies", back_populates="watched_movies")
+    who_watched: Mapped["Movies"] = relationship(
+        "Movies", back_populates="watched_movies"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -239,10 +257,13 @@ class UserManager:
     def __init__(self, db_url: str, echo: bool = False):
         import sys
         from sqlalchemy.pool import NullPool
+
         # Use NullPool during testing to avoid asyncio event loop mismatch errors across test files
         poolclass = NullPool if "pytest" in sys.modules else None
         self.engine = create_async_engine(db_url, echo=echo, poolclass=poolclass)
-        self.session = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
+        self.session = async_sessionmaker(
+            self.engine, class_=AsyncSession, expire_on_commit=False
+        )
 
     async def create_tables(self):
         """Create all tables in the database (called once at startup)."""
@@ -302,7 +323,9 @@ class UserManager:
         if user.username.lower() in RESERVED_USERNAMES:
             raise ReservedUsernameError(user.username)
 
-        hashed = await run_in_threadpool(bcrypt.hashpw, user.password.encode("utf-8"), bcrypt.gensalt())
+        hashed = await run_in_threadpool(
+            bcrypt.hashpw, user.password.encode("utf-8"), bcrypt.gensalt()
+        )
         created_at = datetime.now(timezone.utc).isoformat()
 
         # Registration now always defaults to the 'user' role.
@@ -364,6 +387,7 @@ class UserManager:
         Ensures at least one admin exists in the system.
         """
         import os
+
         username = os.getenv("INITIAL_ADMIN_USERNAME")
         password = os.getenv("INITIAL_ADMIN_PASSWORD")
         email = os.getenv("INITIAL_ADMIN_EMAIL")
@@ -382,7 +406,9 @@ class UserManager:
             return
 
         # Seed the superuser
-        hashed = await run_in_threadpool(bcrypt.hashpw, password.encode("utf-8"), bcrypt.gensalt())
+        hashed = await run_in_threadpool(
+            bcrypt.hashpw, password.encode("utf-8"), bcrypt.gensalt()
+        )
         created_at = datetime.now(timezone.utc).isoformat()
 
         new_admin = User(
@@ -398,10 +424,10 @@ class UserManager:
             ip="127.0.0.1",
             ai_enabled=True,
         )
-        
+
         try:
             session.add(new_admin)
-            await session.flush() # Try to push to DB early to catch errors here
+            await session.flush()  # Try to push to DB early to catch errors here
             logger.info(f"Successfully seeded superuser: {username}")
         except Exception as e:
             # If another worker beat us to it, just log and continue
@@ -442,7 +468,9 @@ class UserManager:
         return {c.name: getattr(user, c.name) for c in user.__table__.columns}
 
     @transaction
-    async def get_all_users(self, session: AsyncSession, skip: int = 0, limit: int = 10) -> list[dict]:
+    async def get_all_users(
+        self, session: AsyncSession, skip: int = 0, limit: int = 10
+    ) -> list[dict]:
         """
         Return a paginated list of all user records.
 
@@ -459,7 +487,12 @@ class UserManager:
 
     @transaction
     async def update_user_field(
-        self, session: AsyncSession, username: str, field: str, value: str, current_password: Optional[str] = None
+        self,
+        session: AsyncSession,
+        username: str,
+        field: str,
+        value: str,
+        current_password: Optional[str] = None,
     ) -> bool:
         """
         Update a single field on a user record.
@@ -479,37 +512,51 @@ class UserManager:
 
         f_lower = field.lower()
         ALLOWED_FIELDS = {"password", "email", "ai_enabled", "username", "max_toasts"}
-        
+
         if f_lower not in ALLOWED_FIELDS:
-            logger.warning(f"Unauthorized update attempt on field '{field}' for user {username}")
+            logger.warning(
+                f"Unauthorized update attempt on field '{field}' for user {username}"
+            )
             raise ValueError(f"Field '{field}' cannot be updated via this endpoint.")
 
         # Require password verification for sensitive changes
         if f_lower in {"password", "email"}:
             if not current_password:
                 raise ValueError("Current password is required to change this setting.")
-            
+
             # Verify current password (offloaded to threadpool to avoid blocking event loop)
             stored_hash = user.password.encode("utf-8")
-            if not await run_in_threadpool(bcrypt.checkpw, current_password.encode("utf-8"), stored_hash):
+            if not await run_in_threadpool(
+                bcrypt.checkpw, current_password.encode("utf-8"), stored_hash
+            ):
                 logger.warning(f"Failed password verification for user {username}")
                 raise ValueError("Invalid current password.")
 
             # Prevent updating to the exact same value
             if f_lower == "email":
                 if value.lower() == user.email.lower():
-                    raise ValueError("New email must be different from your current one.")
-            
+                    raise ValueError(
+                        "New email must be different from your current one."
+                    )
+
             if f_lower == "password":
-                if await run_in_threadpool(bcrypt.checkpw, value.encode("utf-8"), stored_hash):
-                    raise ValueError("New password must be different from your current one.")
-            
+                if await run_in_threadpool(
+                    bcrypt.checkpw, value.encode("utf-8"), stored_hash
+                ):
+                    raise ValueError(
+                        "New password must be different from your current one."
+                    )
+
             if f_lower == "username":
                 if value.lower() == user.username.lower():
-                    raise ValueError("New username must be different from your current one.")
+                    raise ValueError(
+                        "New username must be different from your current one."
+                    )
 
         if f_lower == "password":
-            hashed = await run_in_threadpool(bcrypt.hashpw, value.encode("utf-8"), bcrypt.gensalt())
+            hashed = await run_in_threadpool(
+                bcrypt.hashpw, value.encode("utf-8"), bcrypt.gensalt()
+            )
             setattr(user, "password", hashed.decode("utf-8"))
             return True
 
@@ -558,9 +605,12 @@ class MovieManager:
     def __init__(self, db_url: str, echo: bool = False) -> None:
         import sys
         from sqlalchemy.pool import NullPool
+
         poolclass = NullPool if "pytest" in sys.modules else None
         self.engine = create_async_engine(db_url, echo=echo, poolclass=poolclass)
-        self.session = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
+        self.session = async_sessionmaker(
+            self.engine, class_=AsyncSession, expire_on_commit=False
+        )
 
     @staticmethod
     def transaction(func):
@@ -607,7 +657,7 @@ class MovieManager:
             )
             result = await session.execute(stmt)
             genre_rows = result.scalars().all()
-            
+
         genre_ids = ",".join(genre_rows)
         genre_ids = genre_ids.strip(",")
         if not genre_ids or genre_ids is None:
@@ -645,20 +695,18 @@ class MovieManager:
 
         # SQL-level pagination — only fetches the requested slice
         movies_stmt = (
-            select(Movies)
-            .where(Movies.user_id == user_row)
-            .offset(skip)
-            .limit(limit)
+            select(Movies).where(Movies.user_id == user_row).offset(skip).limit(limit)
         )
         movies_result = await session.execute(movies_stmt)
         movies = movies_result.scalars().all()
         return [
-            {c.name: getattr(m, c.name) for c in m.__table__.columns}
-            for m in movies
+            {c.name: getattr(m, c.name) for c in m.__table__.columns} for m in movies
         ]
 
     @transaction
-    async def delete_movie(self, session: AsyncSession, username: str, movie_id: int) -> bool:
+    async def delete_movie(
+        self, session: AsyncSession, username: str, movie_id: int
+    ) -> bool:
         """
         Remove a movie from a user's tracked collection by its database ID.
 
@@ -723,12 +771,13 @@ class MovieManager:
                 if status == "Watched":
                     # Check if already marked as watched
                     already_watched_stmt = select(WatchedMovies).where(
-                        WatchedMovies.user_id == user.id, WatchedMovies.movie_id == movie.id
+                        WatchedMovies.user_id == user.id,
+                        WatchedMovies.movie_id == movie.id,
                     )
                     already_watched_result = await session.execute(already_watched_stmt)
                     if already_watched_result.scalar_one_or_none():
                         raise MovieAlreadyExists(movie.title)
-                    
+
                     watched_entry = WatchedMovies(
                         user_id=user.id,
                         movie_id=movie.id,
@@ -741,7 +790,8 @@ class MovieManager:
                     # If changed from Watched to something else, remove from WatchedMovies
                     await session.execute(
                         delete(WatchedMovies).where(
-                            WatchedMovies.user_id == user.id, WatchedMovies.movie_id == movie.id
+                            WatchedMovies.user_id == user.id,
+                            WatchedMovies.movie_id == movie.id,
                         )
                     )
 
