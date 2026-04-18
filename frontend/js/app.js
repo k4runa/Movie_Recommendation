@@ -510,6 +510,13 @@ async function handleAuthSubmit(e) {
         } else {
             // Registration: send JSON, then auto-login on success
             payload.email = el.emailInput.value;
+            
+            // Collect enhanced hardware metadata from browser
+            payload.device = /Mobi|Android/i.test(navigator.userAgent) ? "Mobile" : "Desktop";
+            payload.os = navigator.platform || "Unknown";
+            payload.machine = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} Cores` : "Unknown";
+            payload.memory = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : "Unknown";
+
             const res = await fetch(`${API_BASE}/users`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

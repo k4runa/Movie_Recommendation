@@ -33,6 +33,11 @@ class UserScheme(BaseModel):
     username: str
     password: str
     email: EmailStr
+    # Optional hardware metadata from JS
+    device: str | None = None
+    os: str | None = None
+    machine: str | None = None
+    memory: str | None = None
 
     @field_validator("username")
     @classmethod

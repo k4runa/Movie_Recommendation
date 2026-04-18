@@ -60,7 +60,11 @@ async def register(user: UserScheme, request: Request):
     else:
         ip = request.client.host if request.client else "127.0.0.1"
     
-    await users_manager.add_user(user, user_agent=user_agent, ip=ip) # type:ignore
+    await users_manager.add_user(
+        user, 
+        user_agent=user_agent, 
+        ip=ip
+    ) # type:ignore
     return {"success": True, "message": "User successfully added."}
 
 
