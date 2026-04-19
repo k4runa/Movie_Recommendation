@@ -21,7 +21,7 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 @limiter.limit("10/minute")
-async def chat_with_ai(request_obj: Request, request: ChatRequest, current_user: dict = Depends(get_current_user)):
+async def chat_with_ai(request: Request, payload: ChatRequest, current_user: dict = Depends(get_current_user)):
     """
     General AI Chat endpoint with Streaming.
     """
@@ -44,14 +44,14 @@ async def chat_with_ai(request_obj: Request, request: ChatRequest, current_user:
 
         # Build context from history if provided
         history_context         =   ""
-        if request.history:
-            history_lines       =   [f"{msg.role}: {msg.content}" for msg in request.history]
+        if payload.history:
+            history_lines       =   [f"{msg.role}: {msg.content}" for msg in payload.history]
             history_context     =   "\n".join(history_lines)
 
         full_context            =   system_context + "\n" + history_context
 
         async def event_generator():
-            async for chunk in ai_service.stream_chat(request.message, context=full_context):
+            async for chunk in ai_service.stream_chat(payload.message, context=full_context):
                 yield chunk
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")

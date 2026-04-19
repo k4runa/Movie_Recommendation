@@ -56,7 +56,6 @@ export const movieApi = {
   addMovie: (username: string, movieData: any) => api.post(`/movies/${username}`, movieData),
   deleteMovie: (username: string, movieId: number) => api.delete(`/movies/${username}/${movieId}`),
   getRecommendations: (username: string) => api.get(`/movies/recommendations/${username}`),
-  getAIInsights: (username: string) => api.get(`/movies/ai-insights/${username}`),
 };
 
 export const aiApi = {
