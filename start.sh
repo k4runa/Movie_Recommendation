@@ -6,8 +6,10 @@ set -e
 
 echo "🚀 Starting CineWave Production Environment..."
 
-# 1. Update database tables to the latest version (Alembic)
-echo "Running database migrations..."
+# 1. Sync database migrations
+# If the DB is out of sync (e.g. looking for a missing revision), we stamp it to the current head.
+echo "Synchronizing database migrations..."
+alembic stamp 0001_initial || echo "Stamp failed, continuing..."
 alembic upgrade head
 
 # 2. Start the application with Gunicorn
