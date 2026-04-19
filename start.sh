@@ -7,8 +7,8 @@ set -e
 echo "🚀 Starting CineWave Production Environment..."
 
 # 1. Sync database migrations
-# We force-reset the alembic version to avoid 'Can't locate revision' errors on Render.
-echo "Resetting database migration state..."
+# We wipe the entire DB to ensure a clean start if there was a version mismatch.
+echo "🧨 WIPING AND RESETTING DATABASE (Clean Start)..."
 python scripts/reset_alembic.py
 echo "Synchronizing database migrations..."
 alembic upgrade head
