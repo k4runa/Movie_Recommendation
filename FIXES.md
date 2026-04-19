@@ -8,7 +8,7 @@ This document details all fixes applied as a result of a comprehensive security 
 
 ### 1. Removed Hardcoded Database Credentials from `alembic.ini`
 **File:** `alembic.ini`
-Database credentials (`cinewave:cinewave_secret`) were stored in plaintext. Replaced with a non-functional placeholder; the actual URL is loaded from `DATABASE_URL_SYNC` environment variable via `env.py`.
+Database credentials were stored in plaintext. Replaced with a non-functional placeholder; the actual URL is loaded from `DATABASE_URL_SYNC` environment variable via `env.py`.
 
 ### 2. Closed DoS Vector on Chat Endpoint
 **File:** `routers/ai.py`
@@ -89,19 +89,6 @@ Contains all required environment variables as safe placeholders.
 - Added `AUDIT_REPORT.md` (contains security findings, should not be public)
 
 ---
-
-## ⚠️ Manual Action Required
-
-> **WARNING:** The `.env` file was previously committed to Git history. All secrets (JWT key, API keys, DB password) are considered compromised.
-
-```bash
-# 1. Rotate all secrets in your .env file
-# 2. Purge .env from Git history
-pip install git-filter-repo
-git filter-repo --invert-paths --path .env --force
-# 3. Force push to all remotes
-git push --force --all
-```
 
 ---
 
