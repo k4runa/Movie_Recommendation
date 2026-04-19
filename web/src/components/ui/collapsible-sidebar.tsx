@@ -37,7 +37,7 @@ export const CollapsibleSidebar = ({
       <div className="space-y-1 flex-1">
         <Option
           Icon={Film}
-          title="My Movies"
+          title="My collections"
           id="movies"
           selected={activeTab}
           setSelected={setActiveTab}
