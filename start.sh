@@ -7,9 +7,10 @@ set -e
 echo "🚀 Starting CineWave Production Environment..."
 
 # 1. Sync database migrations
-# If the DB is out of sync (e.g. looking for a missing revision), we stamp it to the current head.
+# We force-reset the alembic version to avoid 'Can't locate revision' errors on Render.
+echo "Resetting database migration state..."
+python scripts/reset_alembic.py
 echo "Synchronizing database migrations..."
-alembic stamp 0001_initial || echo "Stamp failed, continuing..."
 alembic upgrade head
 
 # 2. Start the application with Gunicorn
