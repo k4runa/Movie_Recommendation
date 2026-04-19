@@ -30,16 +30,45 @@ from services.cache import cache_service
 load_dotenv()
 logger                          =   logging.getLogger(__name__)
 
+# Google Auth Imports
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
 # ---------------------------------------------------------------------------
 # Configuration — sourced from environment variables
 # ---------------------------------------------------------------------------
 SECRET_KEY                      =   os.getenv("JWT_SECRET_KEY")
 ALGORITHM                       =   "HS256" # Hardcoded for security
 ACCESS_TOKEN_EXPIRE_MINUTES     =   int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "120"))
+GOOGLE_CLIENT_ID                =   os.getenv("GOOGLE_CLIENT_ID")
 
 # FastAPI's OAuth2 scheme — extracts the Bearer token from the
 # Authorization header and feeds it to `get_current_user`.
 oauth2_scheme                   =   OAuth2PasswordBearer(tokenUrl = "login")
+
+# ---------------------------------------------------------------------------
+# Google Auth Verification
+# ---------------------------------------------------------------------------
+async def verify_google_token(token: str) -> dict | None:
+    """
+    Verifies a Google ID token and returns the user info if valid.
+    """
+    if not GOOGLE_CLIENT_ID:
+        logger.error("GOOGLE_CLIENT_ID not found in environment variables.")
+        return None
+    
+    try:
+        # id_token.verify_oauth2_token is a blocking call, run it in threadpool
+        idinfo = await run_in_threadpool(
+            id_token.verify_oauth2_token,
+            token,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+        return idinfo
+    except Exception as e:
+        logger.error(f"Google token verification failed: {e}")
+        return None
 
 # ---------------------------------------------------------------------------
 # Token Blacklisting

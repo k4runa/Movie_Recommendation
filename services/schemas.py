@@ -50,6 +50,11 @@ class UserScheme(BaseModel):
         return v
 
 
+class GoogleLoginRequest(BaseModel):
+    """Schema for Google Login requests."""
+    credential: str
+
+
 class MovieScheme(BaseModel):
     query:      str | None  = Field(None, max_length=200)
     tmdb_id:    int         = Field(0, ge=0, le=999999999)

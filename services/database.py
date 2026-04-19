@@ -489,6 +489,66 @@ class UserManager:
         return {c.name: getattr(user, c.name) for c in user.__table__.columns}
 
     @transaction
+    async def get_user_by_email(self, session: AsyncSession, email: str) -> dict | None:
+        """Fetch a user record by email address."""
+        stmt            =   select(User).where(User.email == email, User.is_deleted == False)
+        result          =   await session.execute(stmt)
+        user            =   result.scalar_one_or_none()
+        if user:
+            return {c.name: getattr(user, c.name) for c in user.__table__.columns}
+        return None
+
+    @transaction
+    async def get_or_create_google_user(self, session: AsyncSession, email: str, name: str, ip: str = "Unknown", user_agent: str = "Unknown") -> dict:
+        """Finds a user by email or creates a new one if they don't exist (OAuth)."""
+        stmt            =   select(User).where(User.email == email, User.is_deleted == False)
+        result          =   await session.execute(stmt)
+        user            =   result.scalar_one_or_none()
+        
+        if user:
+            user.last_seen  =   datetime.now(timezone.utc).isoformat()
+            return {c.name: getattr(user, c.name) for c in user.__table__.columns}
+
+        # Create new user
+        base_username   =   email.split("@")[0].replace(".", "_")
+        username        =   base_username
+        
+        # Unique username check
+        counter         =   1
+        while True:
+            exists_stmt =   select(User).where(User.username == username)
+            exists_res  =   await session.execute(exists_stmt)
+            if not exists_res.scalar_one_or_none():
+                break
+            username    =   f"{base_username}{counter}"
+            counter     +=  1
+
+        import secrets
+        random_pass     =   secrets.token_urlsafe(32)
+        hashed          =   await run_in_threadpool(bcrypt.hashpw, random_pass.encode("utf-8"), bcrypt.gensalt())
+        created_at      =   datetime.now(timezone.utc).isoformat()
+
+        new_user        =   User(
+                    username    =   username,
+                    role        =   "user",
+                    password    =   hashed.decode("utf-8"),
+                    email       =   email,
+                    device      =   "Desktop",
+                    os          =   "Unknown",
+                    ip          =   ip,
+                    device_name =   user_agent[:100],
+                    ai_enabled  =   True,
+                    is_deleted  =   False,
+                    created_at  =   created_at,
+                    last_seen   =   created_at,
+        ) # type: ignore
+        
+        session.add(new_user)
+        await session.flush()
+        
+        return {c.name: getattr(new_user, c.name) for c in new_user.__table__.columns}
+
+    @transaction
     async def get_user_by_id(self, session: AsyncSession, id: int) -> dict:
         """
         Retrieve a single user record by primary key.

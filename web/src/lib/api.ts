@@ -32,6 +32,7 @@ api.interceptors.response.use(
 
 export const authApi = {
   login: (credentials: any) => api.post('/login', new URLSearchParams(credentials)),
+  googleLogin: (credential: string) => api.post('/google-login', { credential }),
   register: (userData: any) => api.post('/users', userData),
   getMe: () => {
     const token = localStorage.getItem('access_token');

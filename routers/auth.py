@@ -13,7 +13,8 @@ from services.auth import verify_password, create_access_token, oauth2_scheme
 from services.database import UserNotFoundError
 from services.deps import users_manager, limiter
 import bcrypt
-from services.auth import blacklist_token, SECRET_KEY, ALGORITHM, oauth2_scheme
+from services.auth import blacklist_token, SECRET_KEY, ALGORITHM, oauth2_scheme, verify_google_token
+from services.schemas import GoogleLoginRequest
 import jwt
 from datetime import datetime, timezone
 
@@ -54,6 +55,40 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     access_token            =   create_access_token(data={"sub": user_in_db["username"]})
     
     return {"access_token": access_token,"token_type": "bearer","username": user_in_db["username"],"role": user_in_db["role"],}
+
+
+@router.post("/google-login")
+async def google_login(request: Request, body: GoogleLoginRequest):
+    """
+    Authenticate a user via Google OAuth2.
+    """
+    idinfo = await verify_google_token(body.credential)
+    
+    if not idinfo:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    
+    email = idinfo.get("email")
+    name = idinfo.get("name", "Google User")
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Email not provided by Google")
+    
+    # Get or create user in DB
+    user_in_db = await users_manager.get_or_create_google_user(
+        email=email,
+        name=name,
+        ip=request.client.host if request.client else "Unknown",
+        user_agent=request.headers.get("user-agent", "Unknown")
+    )
+    
+    access_token = create_access_token(data={"sub": user_in_db["username"]})
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "username": user_in_db["username"],
+        "role": user_in_db["role"],
+    }
 
 
 @router.post("/logout")

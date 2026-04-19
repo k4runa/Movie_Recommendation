@@ -4,6 +4,9 @@ import "./globals.css";
 import { BackgroundPaths } from "@/components/layout/background-paths";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { GoogleOAuthProvider } from '@react-oauth/google';
+
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,18 +34,20 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <BackgroundPaths />
-          <main className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
-            {children}
-          </main>
-          <Toaster theme="system" position="top-right" closeButton />
-        </ThemeProvider>
+        <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <BackgroundPaths />
+            <main className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
+              {children}
+            </main>
+            <Toaster theme="system" position="top-right" closeButton />
+          </ThemeProvider>
+        </GoogleOAuthProvider>
       </body>
     </html>
   );

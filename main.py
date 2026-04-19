@@ -68,11 +68,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client; "
+            "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; "
             "img-src 'self' https://image.tmdb.org https://images.placeholders.dev data:; "
-            "connect-src 'self' https://api.themoviedb.org; "
+            "connect-src 'self' https://api.themoviedb.org https://accounts.google.com/gsi/; "
             "font-src 'self' https://fonts.gstatic.com; "
+            "frame-src https://accounts.google.com/gsi/; "
             "frame-ancestors 'none'"
         )
         return response

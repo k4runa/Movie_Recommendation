@@ -8,11 +8,25 @@ import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { GoogleLogin } from "@react-oauth/google";
 
 export function AuthForm() {
     const [mode, setMode] = useState<'login' | 'register'>('login');
     const [isLoading, setIsLoading] = useState(false);
     const login = useAuthStore((state) => state.login);
+    const googleLogin = useAuthStore((state) => state.googleLogin);
+
+    const handleGoogleSuccess = async (credentialResponse: any) => {
+        setIsLoading(true);
+        try {
+            await googleLogin(credentialResponse.credential);
+            toast.success("Welcome back to CineWave");
+        } catch (err) {
+            toast.error("Google Login failed");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -72,16 +86,16 @@ export function AuthForm() {
                                 <p className="text-zinc-400 text-sm">Enter your credentials to access your account</p>
                             </div>
 
-                            <div className="mt-8">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full flex items-center justify-center gap-3 bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 hover:text-white transition-colors h-11"
-                                    onClick={() => toast("Google login coming soon")}
-                                >
-                                    <GoogleIcon />
-                                    <span className="font-semibold text-sm">Continue with Google</span>
-                                </Button>
+                            <div className="mt-8 flex justify-center w-full overflow-hidden">
+                                <GoogleLogin
+                                    onSuccess={handleGoogleSuccess}
+                                    onError={() => toast.error("Google Login Failed")}
+                                    theme="filled_black"
+                                    shape="pill"
+                                    text="continue_with"
+                                    size="large"
+                                    width="100%"
+                                />
                             </div>
 
                             <div className="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -141,16 +155,16 @@ export function AuthForm() {
                                 <p className="text-zinc-400 text-sm">Welcome! Create an account to get started</p>
                             </div>
 
-                            <div className="mt-8">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full flex items-center justify-center gap-3 bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800 hover:text-white transition-colors h-11"
-                                    onClick={() => toast("Google login coming soon")}
-                                >
-                                    <GoogleIcon />
-                                    <span className="font-semibold text-sm">Continue with Google</span>
-                                </Button>
+                            <div className="mt-8 flex justify-center w-full overflow-hidden">
+                                <GoogleLogin
+                                    onSuccess={handleGoogleSuccess}
+                                    onError={() => toast.error("Google Login Failed")}
+                                    theme="filled_black"
+                                    shape="pill"
+                                    text="continue_with"
+                                    size="large"
+                                    width="100%"
+                                />
                             </div>
 
                             <div className="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3">

@@ -6,6 +6,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: any) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
 }
@@ -21,6 +22,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('access_token', access_token);
     const userRes = await authApi.getMe();
     // getMe returns { success: true, data: { user: {...} } }
+    set({ user: userRes.data?.data?.user || userRes.data, isAuthenticated: true, isLoading: false });
+  },
+
+  googleLogin: async (credential) => {
+    const res = await authApi.googleLogin(credential);
+    const { access_token } = res.data;
+    localStorage.setItem('access_token', access_token);
+    const userRes = await authApi.getMe();
     set({ user: userRes.data?.data?.user || userRes.data, isAuthenticated: true, isLoading: false });
   },
 
