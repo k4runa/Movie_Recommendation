@@ -1,5 +1,9 @@
 # CineWave
 
+<p align="center">
+  <img src="./.images/hero.png" alt="CineWave Hero" width="100%" />
+</p>
+
 CineWave is a movie tracking and recommendation system built with FastAPI and Next.js. It features a personalized AI assistant that provides movie suggestions based on your library and preferences.
 
 ## Features
@@ -7,6 +11,13 @@ CineWave is a movie tracking and recommendation system built with FastAPI and Ne
 - **Movie Tracking:** Manage your library of movies, anime, and shows with simple tracking tools.
 - **AI Recommendations:** A personalized assistant that analyzes your taste and explains why certain movies are suggested.
 - **Social Features:** Connect with users who have similar tastes, and communicate through a real-time messaging system.
+
+<p align="center">
+  <img src="./.images/eco-ai.png" alt="Eco AI" width="32%" />
+  <img src="./.images/daily-picks.png" alt="Daily Picks" width="32%" />
+  <img src="./.images/my-collections.png" alt="Collections" width="32%" />
+</p>
+
 - **Privacy Focused:** Control what information is visible on your profile, including your bio, age, location, and library.
 - **Clean Interface:** A high-contrast, professional dashboard designed for clarity and ease of use.
 - **Secure Backend:** Asynchronous FastAPI architecture with identity-based access control and secure authentication.
