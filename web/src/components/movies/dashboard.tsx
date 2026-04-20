@@ -145,7 +145,7 @@ export function MovieDashboard() {
                         e.stopPropagation();
                         handleRemoveMovie(movie.id);
                       }}
-                      className="bg-destructive/80 hover:bg-destructive text-white backdrop-blur-xl px-5 py-2.5 rounded-2xl flex items-center justify-center font-black text-xs uppercase tracking-widest shadow-2xl transition-all hover:scale-105 active:scale-95"
+                      className="bg-background/80 hover:bg-destructive text-muted-foreground hover:text-white backdrop-blur-xl px-5 py-2.5 rounded-2xl flex items-center justify-center font-black text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-105 active:scale-95 border border-border/20 hover:border-destructive"
                       title="Remove from list"
                     >
                       Remove

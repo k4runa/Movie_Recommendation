@@ -13,6 +13,24 @@ CineWave is a high-performance, asynchronous movie tracking and recommendation p
 
 ---
 
+## 🤖 Eco — AI Cinematic Assistant
+
+<p align="center">
+  <img src="./.images/eco-ai.png" alt="Eco AI Assistant" width="800">
+</p>
+
+Meet **Eco**, your personal AI companion for movie discovery.  
+Unlike traditional recommendation systems, Eco doesn't just suggest — it explains. Eco leverages your tracked content and preferences to generate **context-aware recommendations**, making each suggestion uniquely tailored.
+
+- 💬 Natural conversation interface  
+- 🧠 Taste-aware recommendations based on your library  
+- 🔍 Contextual reasoning ("because you liked...")  
+- 🎯 Personalized suggestions across genres and styles  
+
+> Not just *what to watch* — but *why to watch it*.
+
+---
+
 ## 🎬 AI-Powered Daily Picks
 
 <p align="center">
@@ -25,6 +43,24 @@ Each suggestion is not just a result—but an explanation—highlighting *why* i
 - ⭐ AI-curated movie suggestions  
 - 🧠 Explainable recommendations (not black-box)  
 - ➕ One-click tracking to your collection  
+
+---
+
+## 📚 Your Personal Library
+
+<p align="center">
+  <img src="./.images/my-collections.png" alt="Library Dashboard" width="800">
+</p>
+
+A centralized space to manage your cinematic journey.
+
+> **The Core Loop:** Discover → Track → Build Taste.
+> The more you track your movies, the smarter Eco becomes at understanding your unique cinematic profile.
+
+- 🎬 Track movies, anime, and shows in one place  
+- ⭐ Visual ratings and metadata at a glance  
+- ❌ Instant add/remove interactions  
+- ⚡ Smooth, real-time UI experience  
 
 ---
 
