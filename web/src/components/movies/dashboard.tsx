@@ -15,21 +15,18 @@ export function MovieDashboard() {
   const [selectedMovie, setSelectedMovie] = useState<any | null>(null);
 
   useEffect(() => {
-    if (user?.username) {
-      loadMovies();
-    }
+    loadMovies();
 
     // Listen for global movie-added event
     const handleMovieAdded = () => loadMovies();
     window.addEventListener("movie-added", handleMovieAdded);
     return () => window.removeEventListener("movie-added", handleMovieAdded);
-  }, [user]);
+  }, []);
 
   const loadMovies = async () => {
-    if (!user?.username) return;
     setIsLoading(true);
     try {
-      const res = await movieApi.getMovies(user.username);
+      const res = await movieApi.getMovies();
       setMovies(
         res.data?.data?.watched_movies ||
           res.data?.data?.movies ||
@@ -44,9 +41,8 @@ export function MovieDashboard() {
   };
 
   const handleToggleFavorite = async (movieId: number) => {
-    if (!user?.username) return;
     try {
-      const res = await movieApi.toggleFavorite(user.username, movieId);
+      const res = await movieApi.toggleFavorite(movieId);
       if (res.data?.is_favorite) {
         toast.success("Added to favorites!");
       } else {
@@ -59,9 +55,8 @@ export function MovieDashboard() {
   };
 
   const handleRemoveMovie = async (movieId: number) => {
-    if (!user?.username) return;
     try {
-      await movieApi.deleteMovie(user.username, movieId);
+      await movieApi.deleteMovie(movieId);
       toast.success("Movie removed from your list");
       await loadMovies();
     } catch (err: any) {

@@ -13,10 +13,9 @@ export const FavoritesDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchFavorites = async () => {
-    if (!user) return;
     setLoading(true);
     try {
-      const res = await movieApi.getMovies(user.username);
+      const res = await movieApi.getMovies();
       const allMovies = res.data?.data?.watched_movies || [];
       const favs = allMovies.filter((m: any) => m.is_favorite);
       setFavorites(favs);
@@ -32,9 +31,8 @@ export const FavoritesDashboard = () => {
   }, [user]);
 
   const removeFavorite = async (movieId: number) => {
-    if (!user) return;
     try {
-      await movieApi.toggleFavorite(user.username, movieId);
+      await movieApi.toggleFavorite(movieId);
       toast.success("Removed from favorites.");
       fetchFavorites();
     } catch (err) {

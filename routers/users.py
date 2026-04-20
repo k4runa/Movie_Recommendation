@@ -14,14 +14,13 @@ Endpoints:
     PATCH  /users/{username}   — Update a single field (auth required).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, File, UploadFile, Body
+from fastapi import APIRouter, Depends, HTTPException, Request, File, UploadFile, Body, Response
 import os
-import shutil
 from pydantic import BaseModel
 from services.database import logger
 from services.schemas import UserScheme, APIResponseUser, APIResponseUsersList, ProfileUpdate
 from services.deps import users_manager, limiter
-from services.auth import get_current_user, create_access_token, oauth2_scheme, blacklist_token, SECRET_KEY, ALGORITHM
+from services.auth import get_current_user, create_access_token, get_token_from_cookie_or_header, blacklist_token, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 import jwt
 from datetime import datetime, timezone
 
@@ -66,7 +65,7 @@ class UpdateUserRequest(BaseModel):
 
 @router.post("")
 @limiter.limit("5/minute")
-async def register(request: Request, user: UserScheme):
+async def register(response: Response, request: Request, user: UserScheme):
     """
     Register a new user account.
 
@@ -82,7 +81,19 @@ async def register(request: Request, user: UserScheme):
     else:
         ip = request.client.host if request.client else "127.0.0.1"
     await users_manager.add_user(user, user_agent=user_agent, ip=ip) # type:ignore
-    return {"success": True, "message": "User successfully added."}
+    
+    # Fix 8.1: Set cookie on registration
+    access_token = create_access_token(data={"sub": user.username})
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    
+    return {"success": True, "message": "User successfully added.", "access_token": access_token}
 
 
 @router.get("", response_model=APIResponseUsersList)
@@ -120,112 +131,108 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
     """
     Retrieve the authenticated user's own profile using their token.
     """
-    user = await users_manager.get_user_by_username(current_user["username"])
+    user = await users_manager.get_user_by_username(current_user["username"]) #type: ignore
     return {"success": True, "data": {"user": user}}
 
 
-@router.get("/{username}", response_model=APIResponseUser)
-async def get_user_by_username(username: str, current_user: dict = Depends(get_current_user)):
-    """
-    Retrieve the authenticated user's own profile.
-
-    Ownership is enforced — requesting another user's profile returns 403.
-    """
-    if current_user.get("username") != username:
-        raise HTTPException(status_code=403, detail="Not authorized to access this resource")
-    user = await users_manager.get_user_by_username(username)  # type: ignore
-    return {"success": True, "data": {"user": user}}
-
-
-@router.delete("/{username}")
-async def delete_user(username: str, current_user: dict = Depends(get_current_user), token: str = Depends(oauth2_scheme)):
+@router.delete("/")
+async def delete_user(response: Response, current_user: dict = Depends(get_current_user), token: str = Depends(get_token_from_cookie_or_header)):
     """
     Soft-delete the authenticated user's account.
-
-    The record's `is_deleted` flag is set to True; data is preserved
-    for auditing purposes.
     """
-    if current_user.get("username") != username:
-        raise HTTPException(status_code=403, detail="Not authorized to access this resource")
-    success         =   await users_manager.delete_user(username)  # type: ignore
+    username = current_user["username"]
+    success = await users_manager.delete_user(username)  # type: ignore
     if success:
         await _revoke_token(token)
+        response.delete_cookie(key="access_token", httponly=True, samesite="lax")
     return {"success": success}
 
 
-@router.patch("/{username}")
-async def update_user_field(username: str, v: UpdateUserRequest, current_user: dict = Depends(get_current_user), token: str = Depends(oauth2_scheme)):
+@router.patch("/")
+async def update_user_field(response: Response, v: UpdateUserRequest, current_user: dict = Depends(get_current_user), token: str = Depends(get_token_from_cookie_or_header)):
     """
     Update a single field on the authenticated user's profile.
-
-    Password fields are automatically bcrypt-hashed before storage.
     """
-    if current_user.get("username") != username:
-        raise HTTPException(status_code=403, detail="Not authorized to access this resource")
+    username = current_user["username"]
     try:
-        success     =   await users_manager.update_user_field(username, v.field, v.value, v.current_password)  # type: ignore
-        
-        response    =   {"success": str(success)}
+        success = await users_manager.update_user_field(username, v.field, v.value, v.current_password)  # type: ignore
         
         # If username changed, we must issue a new token and revoke the old one
         if v.field.lower() == "username" and success:
             await _revoke_token(token)
-            new_token                   =   create_access_token(data={"sub": v.value})
-            response["new_token"]       =   new_token
-            response["new_username"]    =   v.value
+            new_token = create_access_token(data={"sub": v.value})
+            
+            response.set_cookie(
+                key="access_token",
+                value=new_token,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            )
+            
+            response_data = {"success": str(success)}
+            response_data["new_token"] = new_token
+            response_data["new_username"] = v.value
+            return response_data
 
-        # If password changed, revoke the old token (requires client to log in again)
+        # If password changed, revoke the old token and clear cookie
         elif v.field.lower() == "password" and success:
             await _revoke_token(token)
+            response.delete_cookie(key="access_token", httponly=True, samesite="lax")
             
-        return response
+        return {"success": str(success)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.patch("/{username}/profile")
-async def update_user_profile(username: str, profile_data: ProfileUpdate = Body(...), current_user: dict = Depends(get_current_user)):
+@router.patch("/profile")
+async def update_user_profile(profile_data: ProfileUpdate = Body(...), current_user: dict = Depends(get_current_user)):
     """
     Update multiple profile fields (bio, age, gender, location) at once.
     """
-    if current_user.get("username") != username:
-        raise HTTPException(status_code=403, detail="Not authorized to access this resource")
-    
+    username = current_user["username"]
     # Filter out None values
-    update_dict = {k: v for k, v in profile_data.dict().items() if v is not None}
-    
-    success = await users_manager.update_profile(username, update_dict)
+    update_dict = {k: v for k, v in profile_data.model_dump().items() if v is not None} 
+    success = await users_manager.update_profile(username, update_dict) #type: ignore
     return {"success": success}
+
+ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+ALLOWED_AVATAR_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_AVATAR_BYTES = 2 * 1024 * 1024  # 2 MB
 
 @router.post("/avatar")
 @limiter.limit("5/minute")
-async def upload_avatar(
-    request: Request,
-    file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
-):
+async def upload_avatar(request: Request,file: UploadFile = File(...),current_user: dict = Depends(get_current_user)):
     """
     Upload a profile picture for the authenticated user.
     Saves the file locally and updates the avatar_url in the database.
     """
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image.")
+    # Validate MIME type
+    if file.content_type not in ALLOWED_AVATAR_TYPES:
+        raise HTTPException(status_code=400, detail=f"File must be an image ({', '.join(ALLOWED_AVATAR_EXTS)}).")
 
-    # Create filename: username_timestamp.ext
-    ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
+    # Validate extension
+    ext = os.path.splitext(file.filename)[1].lower() if file.filename else ".jpg"
+    if ext not in ALLOWED_AVATAR_EXTS:
+        raise HTTPException(status_code=400, detail=f"Invalid file extension. Allowed: {', '.join(ALLOWED_AVATAR_EXTS)}")
+
+    # Enforce file size server-side (read up to limit + 1 byte to detect oversize)
+    contents = await file.read(MAX_AVATAR_BYTES + 1)
+    if len(contents) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=400, detail="Avatar file must be under 2 MB.")
+
     filename = f"{current_user['username']}_{int(datetime.now().timestamp())}{ext}"
     file_path = os.path.join("uploads", filename)
 
     try:
+        os.makedirs("uploads", exist_ok=True)
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(contents)
         
-        # Public URL (local)
         avatar_url = f"/uploads/{filename}"
-        
-        # Update user in DB
-        await users_manager.update_user_field(current_user["username"], "avatar_url", avatar_url)
+        await users_manager.update_user_field(current_user["username"], "avatar_url", avatar_url)   #type: ignore
         
         return {"success": True, "avatar_url": avatar_url}
     except Exception as e:
-        logger.error(f"Avatar upload failed: {str(e)}")
+        logger.error(f"Avatar upload failed: {type(e).__name__}")
         raise HTTPException(status_code=500, detail="Could not save avatar.")

@@ -5,7 +5,7 @@ interface MovieState {
   recommendations: any[];
   isRecsLoading: boolean;
   lastFetched: number | null;
-  fetchRecommendations: (username: string, force?: boolean) => Promise<void>;
+  fetchRecommendations: (force?: boolean) => Promise<void>;
   clearRecommendations: () => void;
 }
 
@@ -14,7 +14,7 @@ export const useMovieStore = create<MovieState>((set, get) => ({
   isRecsLoading: false,
   lastFetched: null,
 
-  fetchRecommendations: async (username, force = false) => {
+  fetchRecommendations: async (force = false) => {
     const { recommendations, lastFetched } = get();
     
     // Cache logic: don't fetch if we have recs and it's been less than 30 mins, unless forced
@@ -27,7 +27,7 @@ export const useMovieStore = create<MovieState>((set, get) => ({
 
     set({ isRecsLoading: true });
     try {
-      const res = await movieApi.getRecommendations(username);
+      const res = await movieApi.getRecommendations();
       const recs = res.data?.data?.recommendations || res.data?.recommendations || res.data || [];
       set({ 
         recommendations: Array.isArray(recs) ? recs : [], 

@@ -36,17 +36,17 @@ class TestAdversarialAttacks:
         block the database connection pool (since the HTTP call is now
         outside the DB transaction block).
         """
-        mock_fetch.side_effect = httpx.ReadTimeout("TMDB is down")
-        
-        # Test that the exception is safely caught by our error handling layer
-        manager = MovieManager.__new__(MovieManager)
-        
-        from services.database import MovieNotFoundError
-        
-        # Update fetch_tmdb_data mock to return {} which triggers MovieNotFoundError
         mock_fetch.return_value = {}
         mock_fetch.side_effect = None
         
+        # Action: Call add_movie
+        manager = MovieManager()
+        session = AsyncMock()
+        mock_session_context = AsyncMock()
+        mock_session_context.__aenter__.return_value = session
+        manager.session = MagicMock(return_value=mock_session_context)
+        
+        from services.database import MovieNotFoundError
         with pytest.raises(MovieNotFoundError):
             await manager.add_movie("testuser", "inception")
             
@@ -58,12 +58,13 @@ class TestAdversarialAttacks:
         doesn't crash and returns empty safely because we use OFFSET/LIMIT
         instead of loading everything into memory.
         """
-        manager = MovieManager.__new__(MovieManager)
+        manager = MovieManager()
         session = AsyncMock()
         
         # User query succeeds, movies query returns empty
         user_mock = MagicMock()
-        user_mock.scalar_one_or_none.return_value = 1
+        user_obj = MagicMock(id=1)
+        user_mock.scalar_one_or_none.return_value = user_obj
         
         movies_mock = MagicMock()
         movies_mock.scalars().all.return_value = []
@@ -82,7 +83,7 @@ class TestAdversarialAttacks:
         Verifies that the `WatchedMovies` entry is DELETED to prevent
         the AI engine from analyzing dropped movies.
         """
-        manager = MovieManager.__new__(MovieManager)
+        manager = MovieManager()
         session = AsyncMock()
         
         user_mock = MagicMock()
@@ -94,8 +95,9 @@ class TestAdversarialAttacks:
         session.execute = AsyncMock(side_effect=[user_mock, movie_mock, MagicMock()])
         session.commit = AsyncMock()
         
-        manager.session = MagicMock()
-        manager.session.return_value.__aenter__.return_value = session
+        mock_session_context = AsyncMock()
+        mock_session_context.__aenter__.return_value = session
+        manager.session = MagicMock(return_value=mock_session_context)
         
         with patch("services.database.fetch_tmdb_data", new_callable=AsyncMock) as mock_fetch:
             mock_fetch.return_value = {"tmdb_id": 123, "title": "Inception"}
@@ -115,7 +117,7 @@ class TestAdversarialAttacks:
         Verifies that we DO NOT access user.movies (which triggers lazy load),
         but instead use the targeted select(Movies.genre_ids) query.
         """
-        manager = MovieManager.__new__(MovieManager)
+        manager = MovieManager()
         session = AsyncMock()
         
         # Return 50,000 strings instead of ORM objects. 12, 14, 28 are the unique genres.
@@ -123,8 +125,9 @@ class TestAdversarialAttacks:
         rows.scalars().all.return_value = ["12,14", "28,12"] * 25000
         session.execute = AsyncMock(return_value=rows)
         
-        manager.session = MagicMock()
-        manager.session.return_value.__aenter__.return_value = session
+        mock_session_context = AsyncMock()
+        mock_session_context.__aenter__.return_value = session
+        manager.session = MagicMock(return_value=mock_session_context)
         
         top_genres = await manager.get_top_genres("heavy_user")
         
@@ -147,7 +150,7 @@ class TestAdversarialAttacks:
         
         # We need to test the actual endpoint logic in routers/auth.py
         # But we can just use the TestClient
-        response = client.post("/login", data={"username": "ghost_user", "password": "password123"})
+        response = client.post("/login", data={"username": "ghost_user", "password": "SecurePassword123!"})
         
         assert response.status_code == 401
         

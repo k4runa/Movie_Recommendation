@@ -16,6 +16,17 @@ def wipe_and_reset_db():
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
 
+    # Fix 9.3: Add environment check and confirmation
+    is_prod = os.getenv("RENDER") or os.getenv("NODE_ENV") == "production"
+    if is_prod:
+        print("❌ CRITICAL: Reset script blocked in production environment.")
+        return
+
+    confirm = input("⚠️  This will WIPE ALL DATA. Type 'RESET' to confirm: ")
+    if confirm != "RESET":
+        print("Aborted.")
+        return
+
     print(f"🧨 Connecting to database to WIPE EVERYTHING...")
     
     try:

@@ -75,6 +75,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "frame-src https://accounts.google.com/gsi/; "
             "frame-ancestors 'none'"
         )
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         return response
 
 # ---------------------------------------------------------------------------
@@ -125,8 +126,20 @@ app.include_router(social.router)
 
 @app.get("/health", tags=["system"])
 async def health_check():
-    """Lightweight health probe for Docker / load balancer health checks."""
-    return {"status": "healthy"}
+    """Deep health probe: checks application + database connectivity."""
+    from services.database import _engine
+    db_ok = False
+    try:
+        if _engine:
+            async with _engine.connect() as conn:
+                await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+            db_ok = True
+    except Exception:
+        pass
+    status = "healthy" if db_ok else "degraded"
+    code = 200 if db_ok else 503
+    from fastapi.responses import JSONResponse as _JR
+    return _JR(status_code=code, content={"status": status, "database": "ok" if db_ok else "unreachable"})
 
 # ---------------------------------------------------------------------------
 # Static Frontend (SPA)
@@ -155,8 +168,15 @@ async def redirect_to_ui():
 @app.exception_handler(RequestValidationError)
 async def validation_handler(request: Request, exc: RequestValidationError):
     """Return 422 with structured field-level validation errors."""
-    logger.info(f"{request.method} {request.url} -> {exc}")
-    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    errors = exc.errors()
+    for err in errors:
+        err.pop("input", None)
+        if "ctx" in err and isinstance(err["ctx"], dict):
+            for k, v in err["ctx"].items():
+                if isinstance(v, Exception):
+                    err["ctx"][k] = str(v)
+    logger.info(f"{request.method} {request.url} -> Validation Error: {errors}")
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 @app.exception_handler(UserNotFoundError)
@@ -212,6 +232,7 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Catch-all for unhandled exceptions — prevents stack traces from leaking to clients."""
-    logger.exception(f"{request.method} {request.url} -> {exc}")
+    """Catch-all for unhandled exceptions — prevents stack traces and secrets from leaking to clients."""
+    # Log the full exception for debugging, but never send raw str(exc) to the client
+    logger.exception(f"Unhandled error: {request.method} {request.url}")
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})

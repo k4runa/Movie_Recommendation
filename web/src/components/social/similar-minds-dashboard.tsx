@@ -5,7 +5,7 @@ import { socialApi, getFullUrl } from "@/lib/api";
 import { Users, Info, MessageSquare, Loader2, Sparkles, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { useSocialStore } from "@/lib/store";
+import { useSocialUIStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 const getTimeAgo = (dateString: string) => {
@@ -40,7 +40,7 @@ interface SimilarUser {
 }
 
 export const SimilarMindsDashboard = ({ onTabChange }: { onTabChange?: (tab: "movies" | "recommendations" | "settings" | "social" | "favorites" | "messages") => void }) => {
-  const { setActiveChatId } = useSocialStore();
+  const { setActiveChatId } = useSocialUIStore();
   const [matches, setMatches] = useState<SimilarUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<number | null>(null);

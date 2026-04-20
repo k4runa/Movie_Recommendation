@@ -17,12 +17,23 @@ from dotenv import load_dotenv
 import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from starlette.requests import Request
 
 logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Initialize global rate limiter
-limiter = Limiter(key_func=get_remote_address)
+# Use X-Forwarded-For when behind a reverse proxy (Render, Nginx), fallback to remote address.
+def _get_real_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        # Take the first (client) IP, ignore proxy chain
+        return forwarded.split(",")[0].strip()
+    return get_remote_address(request)
+
+import sys
+is_testing = "pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") is not None
+limiter = Limiter(key_func=_get_real_ip, enabled=not is_testing)
 
 # ---------------------------------------------------------------------------
 # Database URL Resolution

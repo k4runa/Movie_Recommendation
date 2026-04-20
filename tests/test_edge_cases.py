@@ -25,7 +25,7 @@ class TestHighValueEdgeCases:
         @transaction decorator MUST catch it, rollback, and re-raise or the session
         will be left in a broken state, causing subsequent queries to fail (500 errors).
         """
-        manager = UserManager.__new__(UserManager)
+        manager = UserManager()
         manager.user_exists = AsyncMock(return_value=False)  # Bypass manual check
         
         # Mock session to raise IntegrityError on commit
@@ -40,12 +40,12 @@ class TestHighValueEdgeCases:
         
         mock_user = MagicMock()
         mock_user.username = "race_user"
-        mock_user.password = "pass123"
+        mock_user.password = "SecurePassword123!"
         mock_user.email = "race@test.com"
         
         # The transaction decorator should rollback and bubble up the exception
         with pytest.raises(IntegrityError):
-            await UserManager.add_user(manager, mock_user) # Call the decorated method!
+            await manager.add_user(mock_user)
             
         mock_session_instance.rollback.assert_called_once()
 
@@ -58,7 +58,7 @@ class TestHighValueEdgeCases:
         or 'is_deleted' via the update_user_field endpoint.
         Why it matters: Critical security boundary. Ensures the whitelist is strictly enforced.
         """
-        manager = UserManager.__new__(UserManager)
+        manager = UserManager()
         
         session = AsyncMock()
         user_result = MagicMock()
@@ -78,7 +78,7 @@ class TestHighValueEdgeCases:
         Protects against: Account takeover via unauthorized email/password changes.
         Why it matters: Validates the bcrypt offloading logic correctly handles verification failure.
         """
-        manager = UserManager.__new__(UserManager)
+        manager = UserManager()
         
         session = AsyncMock()
         mock_user = MagicMock(username="testuser", password="hashed_pass")
@@ -91,7 +91,7 @@ class TestHighValueEdgeCases:
         
         with pytest.raises(ValueError, match="Invalid current password"):
             await UserManager.update_user_field.__wrapped__(
-                manager, session, "testuser", "email", "hacker@test.com", "wrongpass"
+                manager, session, "testuser", "email", "hacker@test.com", "SecurePassword123!"
             )
 
 
@@ -103,7 +103,7 @@ class TestHighValueEdgeCases:
         empty array but still loaded ALL movies into memory. Now it gracefully returns
         an empty list from the DB query without loading anything.
         """
-        manager = MovieManager.__new__(MovieManager)
+        manager = MovieManager()
         
         session = AsyncMock()
         # First execute: user exists. Second execute: empty movies result.
@@ -131,8 +131,14 @@ class TestHighValueEdgeCases:
         # Create a dummy manager with a mock session factory
         class DummyManager:
             def __init__(self):
-                self.mock_session = AsyncMock()
-                self.session = MagicMock(return_value=self.mock_session)
+                self._session_maker = MagicMock()
+            
+            @property
+            def session(self):
+                return self._session_maker
+            @session.setter
+            def session(self, value):
+                self._session_maker = value
 
             @UserManager.transaction
             async def failing_method(self, session):
@@ -142,12 +148,13 @@ class TestHighValueEdgeCases:
                 raise RuntimeError("Unexpected failure")
 
         manager = DummyManager()
+        mock_session_context = AsyncMock()
+        manager.session = MagicMock(return_value=mock_session_context)
         
         with pytest.raises(RuntimeError, match="Unexpected failure"):
             await manager.failing_method()
             
         # Verify rollback was called on the mock session context manager
-        # Since self.session() returns a context manager, we need to inspect its __aenter__ return value
-        mock_session_instance = manager.mock_session.__aenter__.return_value
+        mock_session_instance = mock_session_context.__aenter__.return_value
         mock_session_instance.rollback.assert_called_once()
         mock_session_instance.commit.assert_not_called()

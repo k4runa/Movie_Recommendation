@@ -1,6 +1,8 @@
 import time
 import asyncio
 from typing import Any, Dict, Optional
+import logging
+logger = logging.getLogger(__name__)
 
 class AsyncCache:
     """
@@ -45,8 +47,12 @@ class AsyncCache:
                     if key in self._events:
                         del self._events[key]
         else:
-            await event.wait()
-            return await self.get(key)
+            try:
+                # Fix 6.4: Added timeout to prevent hanging if fetch_func never completes
+                await asyncio.wait_for(event.wait(), timeout=15.0)
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout waiting for cache key: {key}. Falling back to direct fetch.")
+            return await self.get(key) or await fetch_func(*args, **kwargs)
 
     async def get(self, key: str) -> Optional[Any]:
         async with self._lock:

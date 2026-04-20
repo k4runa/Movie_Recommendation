@@ -1,16 +1,48 @@
 # .dockerignore
 # Files and directories excluded from the Docker build context.
+# SECURITY: Prevents secrets, VCS history, and bloat from leaking into images.
 
-.git
+# --- Secrets & Environment ---
 .env
-__pycache__
-*.pyc
-.pytest_cache
-.ruff_cache
-database/
-frontend/
+.env.*
+*.pem
+
+# --- Version Control ---
+.git/
+.gitignore
+
+# --- Node.js (frontend built in separate stage) ---
 web/node_modules/
 web/.next/
 web/out/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
 venv/
 .venv/
+htmlcov/
+.coverage
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Build artifacts & data ---
+database/
+frontend/
+
+# --- Audit & Docs (exclude from prod image) ---
+AUDIT_REPORT.md
+
+# --- Docker (prevent recursive copy) ---
+docker-compose.yml

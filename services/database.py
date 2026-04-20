@@ -14,7 +14,7 @@ Design decisions:
       analytics purposes — this is intentional.
 """
 
-from services.tmdb import fetch_tmdb_data
+from services.tmdb import fetch_tmdb_data, fetch_tmdb_movie_by_id
 from sqlalchemy import (
     ForeignKey,
     String,
@@ -39,7 +39,7 @@ import bcrypt
 from datetime import datetime, timezone
 from collections import Counter
 from dotenv import load_dotenv
-from .schemas import *
+from .schemas import UserScheme
 
 load_dotenv()
 
@@ -59,6 +59,8 @@ if db_url_sync.startswith("postgres://"):
 elif db_url_sync.startswith("postgresql://") and "psycopg2" not in db_url_sync:
     db_url_sync = db_url_sync.replace("postgresql://", "postgresql+psycopg2://", 1)
 os.environ["DATABASE_URL_SYNC"] = db_url_sync
+ 
+SENSITIVE_FIELDS = {"password", "ip", "hostname", "device_name", "machine", "memory", "device", "os"}
 
 # ---------------------------------------------------------------------------
 # Logging Configuration
@@ -284,7 +286,7 @@ class Message(Base):
     deleted_by_receiver: Mapped[bool]               =   mapped_column(Boolean, default=False, server_default="false")
     is_edited:          Mapped[bool]                =   mapped_column(Boolean, default=False, server_default="false")
     edited_at:          Mapped[Optional[str]]       =   mapped_column(String, nullable=True)
-    created_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
+    created_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
 
     sender:             Mapped["User"]              =   relationship("User", foreign_keys=[sender_id], back_populates="sent_messages")
     receiver:           Mapped["User"]              =   relationship("User", foreign_keys=[receiver_id], back_populates="received_messages")
@@ -304,6 +306,9 @@ class Conversation(Base):
     created_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
     updated_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
 
+    user1:              Mapped["User"]              =   relationship("User", foreign_keys=[user1_id])
+    user2:              Mapped["User"]              =   relationship("User", foreign_keys=[user2_id])
+
 
 class SimilarityMatch(Base):
     """
@@ -316,7 +321,7 @@ class SimilarityMatch(Base):
     id:                 Mapped[int]                 =   mapped_column(primary_key=True)
     user_id:            Mapped[int]                 =   mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     target_id:          Mapped[int]                 =   mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    score:              Mapped[float]               =   mapped_column(nullable=False)
+    score:              Mapped[float]               =   mapped_column(nullable=False, index=True)
     reasons:            Mapped[Optional[str]]       =   mapped_column(String, nullable=True) # e.g. "Both love Horror"
     updated_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -349,7 +354,7 @@ class UserManager:
         """
         Manager uses the globally initialized engine and session maker.
         """
-        pass
+        self._session_maker = _session_maker
 
     @property
     def engine(self):
@@ -357,7 +362,11 @@ class UserManager:
 
     @property
     def session(self):
-        return _session_maker
+        return self._session_maker
+    
+    @session.setter
+    def session(self, value):
+        self._session_maker = value
 
     async def create_tables(self):
         """Create all tables in the database (called once at startup)."""
@@ -463,12 +472,9 @@ class UserManager:
                     last_seen   =   created_at,
         )  # type: ignore
 
-        is_user_exists = await self.user_exists(new_user.username)  # type: ignore
-        if is_user_exists:
-            logger.error(f"User already exists: {new_user.username}")
-            raise UserAlreadyExists(new_user.username)  # type: ignore
+        # Fix 5.1: Removed TOCTOU pre-check. Rely on UNIQUE constraint + IntegrityError handler in main.py
         session.add(new_user)
-        logger.info(f"Added user: {new_user.username} - {new_user.email}")
+        logger.info(f"Adding user: {new_user.username} - {new_user.email}")
         return True
 
     @transaction
@@ -539,9 +545,12 @@ class UserManager:
             await session.flush()  # Try to push to DB early to catch errors here
             logger.info(f"Successfully seeded superuser: {username}")
         except Exception as e:
-            # If another worker beat us to it, just log and continue
-            logger.warning(f"Admin seeding conflict (likely another worker): {str(e)}")
-            await session.rollback()
+            # If another worker beat us to it, just log and continue.
+            # No manual rollback here; @transaction handles it if we re-raise, 
+            # but we want to fail gracefully for the admin seed.
+            logger.warning(f"Admin seeding conflict (likely another worker): {type(e).__name__}")
+            # We don't re-raise here because it's a seed operation that shouldn't crash startup
+            # if the admin already exists (due to a race between workers).
 
     @transaction
     async def update_last_seen(self, session: AsyncSession, username: str) -> None:
@@ -635,17 +644,14 @@ class UserManager:
     @transaction
     async def get_user_by_id(self, session: AsyncSession, id: int) -> dict:
         """
-        Retrieve a single user record by primary key.
-
-        Raises:
-            UserNotFoundError: If no user with the given ID exists.
+        Retrieve a single user record by primary key (Fixed 5.2: Filters deleted).
         """
-        stmt            =   select(User).where(User.id == id)
+        stmt            =   select(User).where(User.id == id, User.is_deleted == False)
         result          =   await session.execute(stmt)
         user            =   result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(str(id))
-        return {c.name: getattr(user, c.name) for c in user.__table__.columns}
+        return {c.name: getattr(user, c.name) for c in user.__table__.columns if c.name not in SENSITIVE_FIELDS}
 
     @transaction
     async def get_all_users(self, session: AsyncSession, skip: int = 0, limit: int = 10) -> list[dict]:
@@ -658,7 +664,6 @@ class UserManager:
         """
         limit = min(limit, 100)  # Hard maximum to prevent unbounded queries
         skip = max(skip, 0)
-        SENSITIVE_FIELDS = {"password", "ip", "hostname", "device_name", "machine", "memory"}
         stmt            =   select(User).offset(skip).limit(limit)
         result          =   await session.execute(stmt)
         users           =   result.scalars().all()
@@ -789,7 +794,7 @@ class MovieManager:
         """
         Manager uses the globally initialized engine and session maker.
         """
-        pass
+        self._session_maker = _session_maker
 
     @property
     def engine(self):
@@ -797,7 +802,11 @@ class MovieManager:
 
     @property
     def session(self):
-        return _session_maker
+        return self._session_maker
+    
+    @session.setter
+    def session(self, value):
+        self._session_maker = value
 
     @staticmethod
     def transaction(func):
@@ -988,7 +997,6 @@ class MovieManager:
         Search TMDB for a movie and add it to the user's tracked list.
         Supports either a search query or a direct TMDB ID.
         """
-        from services.tmdb import fetch_tmdb_data, fetch_tmdb_movie_by_id
 
         if tmdb_id:
             data        =   await fetch_tmdb_movie_by_id(tmdb_id)
@@ -1070,11 +1078,22 @@ class SocialManager:
     """
 
     def __init__(self):
-        pass
+        """
+        Manager uses the globally initialized engine and session maker.
+        """
+        self._session_maker = _session_maker
+
+    @property
+    def engine(self):
+        return _engine
 
     @property
     def session(self):
-        return _session_maker
+        return self._session_maker
+    
+    @session.setter
+    def session(self, value):
+        self._session_maker = value
 
     @staticmethod
     def transaction(func):
@@ -1191,7 +1210,10 @@ class SocialManager:
         Hard delete a message if the user is the sender.
         """
         stmt = delete(Message).where(Message.id == message_id, Message.sender_id == user_id)
-        await session.execute(stmt)
+        result = await session.execute(stmt)
+        deleted = result.scalar_one_or_none()
+        if deleted is None:
+            raise ValueError("Message not found or you are not the sender")
 
     @transaction
     async def handle_request(self, session: AsyncSession, user_id: int, other_id: int, action: str):
@@ -1279,6 +1301,9 @@ class SocialManager:
                 Conversation.status == "PENDING"
             )
         
+        from sqlalchemy.orm import joinedload
+        # Fix 5.4: Use joinedload for user1/user2 to avoid N+1
+        stmt = stmt.options(joinedload(Conversation.user1), joinedload(Conversation.user2))
         res = await session.execute(stmt)
         convs = res.scalars().all()
         
@@ -1338,10 +1363,8 @@ class SocialManager:
             unread_res = await session.execute(unread_stmt)
             unread_count = unread_res.scalar() or 0
             
-            # Get participant info
-            p_stmt = select(User).where(User.id == other_id)
-            p_res = await session.execute(p_stmt)
-            participant = p_res.scalar_one_or_none()
+            # Fix 5.4: Use joined participant info from joinedload
+            participant = c.user2 if c.user1_id == user_id else c.user1
             
             if not participant: continue
             
@@ -1426,78 +1449,79 @@ class SocialManager:
         Heavy operation: Re-calculates similarity between this user and all others.
         In a production environment, this should be a background task (Celery/RQ).
         """
-        async with self.session() as session:
-            # 1. Get current user's movies/genres
-            user_stmt = select(Movies).where(Movies.user_id == user_id)
-            user_res = await session.execute(user_stmt)
-            user_movies = user_res.scalars().all()
-            user_movie_ids = {m.tmdb_id for m in user_movies}
-            user_genres = Counter()
-            for m in user_movies:
-                if m.genre_ids:
-                    user_genres.update(m.genre_ids.split(","))
-
-            # 2. Get all other public users
-            others_stmt = select(User.id).where(User.id != user_id, User.is_private == False, User.is_deleted == False)
-            others_res = await session.execute(others_stmt)
-            other_ids = others_res.scalars().all()
-
-            if not other_ids:
-                logger.info("No other users found")
-                return
-
-            # Fetch all movies for all other users in ONE query
-            all_other_movies_stmt = select(Movies).where(Movies.user_id.in_(other_ids))
-            all_other_movies_res = await session.execute(all_other_movies_stmt)
-            all_other_movies = all_other_movies_res.scalars().all()
-
-            # Group by user_id
-            from collections import defaultdict
-            movies_by_user = defaultdict(list)
-            for m in all_other_movies:
-                movies_by_user[m.user_id].append(m)
-
-            for other_id in other_ids:
-                other_movies = movies_by_user[other_id]
-                other_movie_ids = {m.tmdb_id for m in other_movies}
-                
-                # Shared movies score
-                shared_movies = user_movie_ids.intersection(other_movie_ids)
-                movie_score = len(shared_movies) * 0.2 # 5 shared movies = 1.0
-
-                # Shared genres score
-                other_genres = Counter()
-                for m in other_movies:
+        if self.session:
+            async with self.session() as session:
+                # 1. Get current user's movies/genres
+                user_stmt = select(Movies).where(Movies.user_id == user_id)
+                user_res = await session.execute(user_stmt)
+                user_movies = user_res.scalars().all()
+                user_movie_ids = {m.tmdb_id for m in user_movies}
+                user_genres = Counter()
+                for m in user_movies:
                     if m.genre_ids:
-                        other_genres.update(m.genre_ids.split(","))
-                
-                # Simple Jaccard-like similarity for genres
-                common_genres = set(user_genres.keys()).intersection(set(other_genres.keys()))
-                genre_score = len(common_genres) * 0.1 # 10 shared genres = 1.0
-                
-                total_score = min(movie_score + genre_score, 1.0)
-                
-                if total_score > 0.1:
-                    # Upsert similarity match
-                    match_stmt = select(SimilarityMatch).where(SimilarityMatch.user_id == user_id, SimilarityMatch.target_id == other_id)
-                    match_res = await session.execute(match_stmt)
-                    match = match_res.scalar_one_or_none()
+                        user_genres.update(m.genre_ids.split(","))
+
+                # 2. Get all other public users
+                others_stmt = select(User.id).where(User.id != user_id, User.is_private == False, User.is_deleted == False)
+                others_res = await session.execute(others_stmt)
+                other_ids = others_res.scalars().all()
+
+                if not other_ids:
+                    logger.info("No other users found")
+                    return
+
+                # Fetch all movies for all other users in ONE query
+                all_other_movies_stmt = select(Movies).where(Movies.user_id.in_(other_ids))
+                all_other_movies_res = await session.execute(all_other_movies_stmt)
+                all_other_movies = all_other_movies_res.scalars().all()
+
+                # Group by user_id
+                from collections import defaultdict
+                movies_by_user = defaultdict(list)
+                for m in all_other_movies:
+                    movies_by_user[m.user_id].append(m)
+
+                for other_id in other_ids:
+                    other_movies = movies_by_user[other_id]
+                    other_movie_ids = {m.tmdb_id for m in other_movies}
                     
-                    reasons = []
-                    if shared_movies:
-                        reasons.append(f"Both watched {len(shared_movies)} same films")
-                    if common_genres:
-                        reasons.append(f"Shared love for {len(common_genres)} genres")
+                    # Shared movies score
+                    shared_movies = user_movie_ids.intersection(other_movie_ids)
+                    movie_score = len(shared_movies) * 0.2 # 5 shared movies = 1.0
 
-                    if not match:
-                        match = SimilarityMatch(user_id=user_id, target_id=other_id, score=total_score, reasons=", ".join(reasons))
-                        session.add(match)
-                    else:
-                        match.score = total_score
-                        match.reasons = ", ".join(reasons)
-                        match.updated_at = datetime.now(timezone.utc).isoformat()
+                    # Shared genres score
+                    other_genres = Counter()
+                    for m in other_movies:
+                        if m.genre_ids:
+                            other_genres.update(m.genre_ids.split(","))
+                    
+                    # Simple Jaccard-like similarity for genres
+                    common_genres = set(user_genres.keys()).intersection(set(other_genres.keys()))
+                    genre_score = len(common_genres) * 0.1 # 10 shared genres = 1.0
+                    
+                    total_score = min(movie_score + genre_score, 1.0)
+                    
+                    if total_score > 0.1:
+                        # Upsert similarity match
+                        match_stmt = select(SimilarityMatch).where(SimilarityMatch.user_id == user_id, SimilarityMatch.target_id == other_id)
+                        match_res = await session.execute(match_stmt)
+                        match = match_res.scalar_one_or_none()
+                        
+                        reasons = []
+                        if shared_movies:
+                            reasons.append(f"Both watched {len(shared_movies)} same films")
+                        if common_genres:
+                            reasons.append(f"Shared love for {len(common_genres)} genres")
 
-            await session.commit()
+                        if not match:
+                            match = SimilarityMatch(user_id=user_id, target_id=other_id, score=total_score, reasons=", ".join(reasons))
+                            session.add(match)
+                        else:
+                            match.score = total_score
+                            match.reasons = ", ".join(reasons)
+                            match.updated_at = datetime.now(timezone.utc).isoformat()
+
+                await session.commit()
 
     @transaction
     async def get_profile(self, session: AsyncSession, user_id: int) -> dict:

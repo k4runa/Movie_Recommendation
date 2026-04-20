@@ -12,7 +12,7 @@ the API.  FastAPI uses these for:
 """
 
 from pydantic import BaseModel, EmailStr, field_validator, Field
-from typing import List, Optional
+from typing import List
 
 
 # ---------------------------------------------------------------------------
@@ -49,6 +49,18 @@ class UserScheme(BaseModel):
             raise ValueError("Username shouldn't have any special characters.")
         return v
 
+    @field_validator("password")
+    @classmethod
+    def is_strong_password(cls, v):
+        """Enforce password complexity: >= 8 chars, 1 upper, 1 digit, 1 special."""
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one digit.")
+        if not any(c in '!@#$%^&*()-_=+[]{}|;:,.<>?/~`' for c in v):
+            raise ValueError("Password must contain at least one special character.")
+        return v
+
 
 class GoogleLoginRequest(BaseModel):
     """Schema for Google Login requests."""
@@ -73,11 +85,11 @@ class PrivacyUpdate(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
-    nickname:   str | None = None
-    bio:        str | None = None
-    gender:     str | None = None
-    age:        int | None = None
-    location:   str | None = None
+    nickname:   str | None = Field(None, max_length=50)
+    bio:        str | None = Field(None, max_length=500)
+    gender:     str | None = Field(None, max_length=30)
+    age:        int | None = Field(None, ge=13, le=120)
+    location:   str | None = Field(None, max_length=100)
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +102,7 @@ class ProfileUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
-    """Public-safe representation of a user record."""
+    """Public-safe representation of a user record. Sensitive fields (ip, machine, hostname, memory, device_name) are excluded."""
 
     id:         int
     username:   str
@@ -106,8 +118,6 @@ class UserResponse(BaseModel):
     show_location: bool = True
     show_bio:    bool = True
     show_favorites: bool = True
-    device:     str | None = None
-    os:         str | None = None
     country:    str | None = None
     city:       str | None = None
     created_at: str

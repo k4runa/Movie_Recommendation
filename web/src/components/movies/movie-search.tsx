@@ -33,18 +33,16 @@ export function MovieSearch() {
 
     // Initial fetch of tracked movies to show correct status
     const fetchTracked = async () => {
-      if (user?.username) {
-        try {
-          const res = await movieApi.getMovies(user.username);
-          const movies =
-            res.data?.data?.watched_movies ||
-            res.data?.data?.movies ||
-            res.data ||
-            [];
-          setTrackedIds(new Set(movies.map((m: any) => m.tmdb_id)));
-        } catch (err) {
-          console.error("Failed to fetch tracked movies for search", err);
-        }
+      try {
+        const res = await movieApi.getMovies();
+        const movies =
+          res.data?.data?.watched_movies ||
+          res.data?.data?.movies ||
+          res.data ||
+          [];
+        setTrackedIds(new Set(movies.map((m: any) => m.tmdb_id)));
+      } catch (err) {
+        console.error("Failed to fetch tracked movies for search", err);
       }
     };
     fetchTracked();
@@ -93,12 +91,11 @@ export function MovieSearch() {
   };
 
   const handleAddMovie = async (movie: any) => {
-    if (!user?.username) return;
     const tmdbId = movie.tmdb_id;
     if (addingId === tmdbId || trackedIds.has(tmdbId)) return;
     setAddingId(tmdbId);
     try {
-      await movieApi.addMovie(user.username, { tmdb_id: tmdbId });
+      await movieApi.addMovie({ tmdb_id: tmdbId });
       toast.success(`${movie.title} added to library!`);
       setTrackedIds((prev) => new Set(prev).add(tmdbId));
       window.dispatchEvent(

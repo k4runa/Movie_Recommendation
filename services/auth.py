@@ -16,14 +16,15 @@ Environment variables (loaded from .env):
     ACCESS_TOKEN_EXPIRE_MINUTES — Token TTL in minutes, defaults to 120.
 """
 
+import httpx
 import os
 import bcrypt
 import logging
 import jwt
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException, status, Depends
-from fastapi.concurrency import run_in_threadpool
 from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, status, Depends, Request
+from starlette.concurrency import run_in_threadpool
 from dotenv import load_dotenv
 from services.cache import cache_service
 
@@ -43,8 +44,21 @@ ACCESS_TOKEN_EXPIRE_MINUTES     =   int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES",
 GOOGLE_CLIENT_ID                =   os.getenv("GOOGLE_CLIENT_ID")
 
 # FastAPI's OAuth2 scheme — extracts the Bearer token from the
-# Authorization header and feeds it to `get_current_user`.
-oauth2_scheme                   =   OAuth2PasswordBearer(tokenUrl = "login")
+# Authorization header if cookie is missing.
+oauth2_scheme                   =   OAuth2PasswordBearer(tokenUrl = "login", auto_error=False)
+
+def get_token_from_cookie_or_header(request: Request, header_token: str | None = Depends(oauth2_scheme)) -> str:
+    """Extracts token from httpOnly cookie 'access_token' or fallback to Authorization header."""
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        return cookie_token
+    if header_token:
+        return header_token
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 # ---------------------------------------------------------------------------
 # Google Auth Verification
@@ -55,31 +69,28 @@ async def verify_google_token(token: str) -> dict | None:
     and if that fails, it tries to fetch user info via Access Token.
     """
     if not GOOGLE_CLIENT_ID:
-        logger.error("GOOGLE_CLIENT_ID not found in environment variables.")
+        logger.error(f"GOOGLE_CLIENT_ID not found.")
         return None
-    
-    # 1. Try as ID Token (Standard)
     try:
-        idinfo = await run_in_threadpool(
-            id_token.verify_oauth2_token,
-            token,
-            google_requests.Request(),
-            GOOGLE_CLIENT_ID
-        )
-        return idinfo
-    except Exception:
-        # 2. Try as Access Token (if it's not an ID Token)
-        import httpx
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={token}")
-                if resp.status_code == 200:
-                    return resp.json()
-        except Exception as e:
-            logger.error(f"Google access token verification failed: {e}")
-    
-    return None
+        idinfo = await run_in_threadpool(id_token.verify_oauth2_token,token,google_requests.Request(),GOOGLE_CLIENT_ID)
+        if idinfo["aud"] != GOOGLE_CLIENT_ID:
+            return None
+        return idinfo   #type: ignore
+    except Exception as exc:
+        logger.warning(f"ID token verification failed - error: {str(exc)}")
 
+    try:
+        async with httpx.AsyncClient(timeout=0.5) as client:
+            response = await client.get("https://oauth2.googleapis.com/tokeninfo",params={"access_token": token})
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("aut") != GOOGLE_CLIENT_ID:
+                    return None
+                return data
+    except Exception as exc:
+        logger.error(f"Access token verification failed - error: {str(exc)}")
+
+    return None
 # ---------------------------------------------------------------------------
 # Token Blacklisting
 # ---------------------------------------------------------------------------
@@ -90,6 +101,7 @@ async def is_token_blacklisted(token: str) -> bool:
 
 async def blacklist_token(token: str, expires_in_seconds: int):
     """Add a token to the blacklist until it naturally expires."""
+    logger.info(f"Revoking token (Fix 2.2): expires in {expires_in_seconds}s")
     await cache_service.set(f"bl_{token}", "revoked", ttl = expires_in_seconds)
 
 
@@ -148,7 +160,7 @@ def create_access_token(data: dict):
 # ---------------------------------------------------------------------------
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(get_token_from_cookie_or_header)):
     """
     Decode and validate a Bearer token, returning the authenticated user's
     identity as a dict.
@@ -181,18 +193,22 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         username:str                =   payload.get("sub")  # type: ignore
         if username:
             try:
-                user_in_db = await users_manager.get_user_by_username(username)
+                user_in_db = await users_manager.get_user_by_username(username) #type: ignore
                 if user_in_db.get("is_deleted"):
                     logger.warning(f"Attempted access by deleted user: {username}")
                     raise credentials_exception
                 
                 # Update last_seen asynchronously
-                await users_manager.update_last_seen(username)
+                await users_manager.update_last_seen(username)  #type: ignore
             except UserNotFoundError:
                 logger.warning(f"Attempted access by non-existent user: {username}")
                 raise credentials_exception
 
-            token_data              =   {"username": username, "role": user_in_db.get("role", "user")}
+            token_data = {
+                "username": username,
+                "id": user_in_db.get("id"),
+                "role": user_in_db.get("role", "user")
+            }
             return token_data
         raise credentials_exception
     except jwt.ExpiredSignatureError:

@@ -51,8 +51,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const res = await authApi.login(credentials);
-      const { access_token, username, role } = res.data;
-      localStorage.setItem('access_token', access_token);
+      const { username, role } = res.data;
       
       try {
         const userRes = await authApi.getMe();
@@ -79,8 +78,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const res = await authApi.googleLogin(credential);
-      const { access_token, username, role } = res.data;
-      localStorage.setItem('access_token', access_token);
+      const { username, role } = res.data;
       
       try {
         const userRes = await authApi.getMe();
@@ -109,7 +107,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err) {
       console.warn("Logout request failed, continuing local logout", err);
     }
-    localStorage.removeItem('access_token');
     set({ user: null, isAuthenticated: false, isLoading: false });
   },
 
@@ -123,12 +120,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   checkAuth: async (isSilent = false) => {
     if (!isSilent) set({ isLoading: true });
     try {
-      const token = localStorage.getItem('access_token');
-      if (!token) throw new Error('No token');
       const res = await authApi.getMe();
       set({ user: res.data?.data?.user || res.data, isAuthenticated: true, isLoading: false });
     } catch (err) {
-      localStorage.removeItem('access_token');
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
@@ -142,7 +136,7 @@ interface SocialState {
   setUnreadTotal: (count: number) => void;
 }
 
-export const useSocialStore = create<SocialState>((set) => ({
+export const useSocialUIStore = create<SocialState>((set) => ({
   activeChatId: null,
   setActiveChatId: (id) => set({ activeChatId: id }),
   unreadTotal: 0,

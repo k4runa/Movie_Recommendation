@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { socialApi, getFullUrl } from "@/lib/api";
-import { useAuthStore, useSocialStore } from "@/lib/store";
+import { useAuthStore, useSocialUIStore } from "@/lib/store";
 import {
   Search,
   Send,
@@ -44,7 +44,7 @@ const isUserOnline = (lastSeen: string | null) => {
 
 export const MessagesDashboard = () => {
   const { user } = useAuthStore();
-  const { activeChatId, setActiveChatId, setUnreadTotal } = useSocialStore();
+  const { activeChatId, setActiveChatId, setUnreadTotal } = useSocialUIStore();
   const [conversations, setConversations] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

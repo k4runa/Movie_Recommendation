@@ -32,8 +32,8 @@ COPY --from=frontend-builder /app/web/out /app/frontend
 
 EXPOSE 8000
 
-# Ensure the startup script is executable
-RUN chmod +x start.sh
-
 # Start using the custom startup script (runs Alembic then Gunicorn)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
 CMD ["./start.sh"]

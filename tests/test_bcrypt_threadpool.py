@@ -30,7 +30,7 @@ class TestBcryptThreadpool:
         import bcrypt
         from services.schemas import UserScheme
 
-        mock_user_scheme = UserScheme(username="testuser", password="secure123", email="test@test.com")
+        mock_user_scheme = UserScheme(username="testuser", password="SecurePassword123!", email="test@test.com")
 
         # Mock session
         session = AsyncMock()

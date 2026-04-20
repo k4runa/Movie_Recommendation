@@ -4,6 +4,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
 });
 
 export const getFullUrl = (path: string) => {
@@ -12,16 +13,8 @@ export const getFullUrl = (path: string) => {
   return `${API_BASE_URL}${path}`;
 };
 
-// Request interceptor for JWT
-api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
+// Request interceptor — cookies are handled automatically via withCredentials: true
+api.interceptors.request.use((config) => config);
 
 // Response interceptor — auto-logout on 401 (expired/invalid token)
 api.interceptors.response.use(
@@ -30,7 +23,6 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const isAuthEndpoint = error.config?.url === '/logout' || error.config?.url === '/login';
       if (!isAuthEndpoint) {
-        localStorage.removeItem('access_token');
         // Trigger a storage event so Zustand stores can react
         window.dispatchEvent(new Event('auth-expired'));
       }
@@ -46,11 +38,11 @@ export const authApi = {
   getMe: () => {
     return api.get(`/users/me`);
   },
-  updateUserField: (username: string, data: { field: string; value: any; current_password?: string }) => {
-    return api.patch(`/users/${username}`, data);
+  updateUserField: (data: { field: string; value: any; current_password?: string }) => {
+    return api.patch(`/users/`, data);
   },
-  updateProfile: (username: string, data: any) => {
-    return api.patch(`/users/${username}/profile`, data);
+  updateProfile: (data: any) => {
+    return api.patch(`/users/profile`, data);
   },
   uploadAvatar: (formData: FormData) => {
     return api.post('/users/avatar', formData, {
@@ -63,25 +55,24 @@ export const authApi = {
 };
 
 export const movieApi = {
-  getMovies: (username: string) => api.get(`/movies/${username}`),
+  getMovies: () => api.get(`/movies/`),
   searchMovies: (query: string) => api.get(`/movies/search?query=${query}`),
-  addMovie: (username: string, movieData: any) => api.post(`/movies/${username}`, movieData),
-  deleteMovie: (username: string, movieId: number) => api.delete(`/movies/${username}/${movieId}`),
-  getRecommendations: (username: string) => api.get(`/movies/recommendations/${username}`),
-  toggleFavorite: (username: string, movieId: number) => api.post(`/movies/${username}/${movieId}/favorite`),
+  addMovie: (movieData: any) => api.post(`/movies/`, movieData),
+  deleteMovie: (movieId: number) => api.delete(`/movies/${movieId}`),
+  getRecommendations: () => api.get(`/movies/recommendations`),
+  toggleFavorite: (movieId: number) => api.post(`/movies/${movieId}/favorite`),
 };
 
 export const aiApi = {
   chat: (message: string, history?: { role: string; content: string }[]) =>
     api.post('/ai/chat', { message, history: history || [] }),
   streamChat: async (message: string, history?: { role: string; content: string }[]) => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
     return fetch(`${API_BASE_URL}/ai/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
+      credentials: 'include', // Fix 8.1: Send cookies with fetch
       body: JSON.stringify({ message, history: history || [] }),
     });
   },

@@ -92,10 +92,9 @@ export function SettingsDashboard() {
   }, [user]);
 
   const handleUpdateProfile = async () => {
-    if (!user?.username) return;
     setIsSubmitting(true);
     try {
-      await authApi.updateProfile(user.username, {
+      await authApi.updateProfile({
         nickname: profileValues.nickname,
         bio: profileValues.bio,
         gender: profileValues.gender,
@@ -113,13 +112,13 @@ export function SettingsDashboard() {
   };
 
   const handleUpdateUsername = async () => {
-    if (!newUsername || !currentPassword || !user?.username) {
+    if (!newUsername || !currentPassword) {
       toast.error("Please provide new username and current password");
       return;
     }
     setIsSubmitting(true);
     try {
-      const res = await authApi.updateUserField(user.username, {
+      const res = await authApi.updateUserField({
         field: "username",
         value: newUsername,
         current_password: currentPassword
@@ -140,11 +139,10 @@ export function SettingsDashboard() {
   };
 
   const handleToggleAi = async () => {
-    if (!user?.username) return;
     const newValue = !aiEnabled;
     setAiEnabled(newValue);
     try {
-      await authApi.updateUserField(user.username, {
+      await authApi.updateUserField({
         field: "ai_enabled",
         value: newValue
       });
@@ -520,7 +518,7 @@ export function SettingsDashboard() {
                 label="Show Bio" 
                 checked={user?.show_bio ?? true} 
                 onToggle={async (val) => {
-                  await authApi.updateUserField(user!.username, { field: "show_bio", value: val });
+                  await authApi.updateUserField({ field: "show_bio", value: val });
                   await checkAuth(true);
                 }}
               />
@@ -528,7 +526,7 @@ export function SettingsDashboard() {
                 label="Show Favorites" 
                 checked={user?.show_favorites ?? true} 
                 onToggle={async (val) => {
-                  await authApi.updateUserField(user!.username, { field: "show_favorites", value: val });
+                  await authApi.updateUserField({ field: "show_favorites", value: val });
                   await checkAuth(true);
                 }}
               />
@@ -536,7 +534,7 @@ export function SettingsDashboard() {
                 label="Show Age" 
                 checked={user?.show_age ?? true} 
                 onToggle={async (val) => {
-                  await authApi.updateUserField(user!.username, { field: "show_age", value: val });
+                  await authApi.updateUserField({ field: "show_age", value: val });
                   await checkAuth(true);
                 }}
               />
@@ -544,7 +542,7 @@ export function SettingsDashboard() {
                 label="Show Gender" 
                 checked={user?.show_gender ?? true} 
                 onToggle={async (val) => {
-                  await authApi.updateUserField(user!.username, { field: "show_gender", value: val });
+                  await authApi.updateUserField({ field: "show_gender", value: val });
                   await checkAuth(true);
                 }}
               />
@@ -552,7 +550,7 @@ export function SettingsDashboard() {
                 label="Show Location" 
                 checked={user?.show_location ?? true} 
                 onToggle={async (val) => {
-                  await authApi.updateUserField(user!.username, { field: "show_location", value: val });
+                  await authApi.updateUserField({ field: "show_location", value: val });
                   await checkAuth(true);
                 }}
               />
@@ -560,7 +558,7 @@ export function SettingsDashboard() {
                 label="Public Discovery" 
                 checked={!(user?.is_private ?? false)} 
                 onToggle={async (val) => {
-                  await authApi.updateUserField(user!.username, { field: "is_private", value: !val });
+                  await authApi.updateUserField({ field: "is_private", value: !val });
                   await checkAuth(true);
                 }}
               />

@@ -14,23 +14,23 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFullUrl } from "@/lib/api";
-import { useSocialStore } from "@/lib/store";
+import { useSocialUIStore } from "@/lib/store";
 
-export const CollapsibleSidebar = ({ 
-  activeTab, 
-  setActiveTab, 
+export const CollapsibleSidebar = ({
+  activeTab,
+  setActiveTab,
   logout,
   user,
   onSelectUser
-}: { 
-  activeTab: string, 
+}: {
+  activeTab: string,
   setActiveTab: (tab: any) => void,
   logout: () => void,
   user: any,
   onSelectUser: (user: any) => void
 }) => {
   const [open, setOpen] = useState(true);
-  const { unreadTotal } = useSocialStore();
+  const { unreadTotal } = useSocialUIStore();
 
   return (
     <nav
@@ -116,14 +116,14 @@ export const CollapsibleSidebar = ({
 
 const Option = ({ Icon, title, id, selected, setSelected, open, badgeCount }: any) => {
   const isSelected = selected === id;
-  
+
   return (
     <button
       onClick={() => setSelected(id)}
       className={cn(
         "relative flex h-11 w-full items-center rounded-lg transition-all duration-200 mb-1",
-        isSelected 
-          ? "bg-card text-foreground border border-border shadow-md" 
+        isSelected
+          ? "bg-card text-foreground border border-border shadow-md"
           : "text-muted-foreground hover:bg-card hover:text-foreground"
       )}
     >
@@ -133,7 +133,7 @@ const Option = ({ Icon, title, id, selected, setSelected, open, badgeCount }: an
           <div className="absolute top-2 right-3 size-2 bg-primary rounded-full border border-background shadow-sm animate-pulse" />
         )}
       </div>
-      
+
       {open && (
         <div className="flex-1 flex justify-between items-center pr-4">
           <span className="text-xs font-black uppercase tracking-widest">
@@ -173,17 +173,17 @@ const TitleSection = ({ open, user }: any) => {
 
 const Logo = ({ user }: any) => {
   const hasAvatar = !!user?.avatar_url;
-  
+
   return (
     <div className={cn(
       "size-10 shrink-0 rounded-xl shadow-lg overflow-hidden border border-border flex items-center justify-center",
       !hasAvatar && "bg-foreground"
     )}>
       {hasAvatar ? (
-        <img 
-          src={getFullUrl(user.avatar_url)} 
-          alt="Logo" 
-          className="w-full h-full object-cover block" 
+        <img
+          src={getFullUrl(user.avatar_url)}
+          alt="Logo"
+          className="w-full h-full object-cover block"
         />
       ) : (
         <Film className="w-5 h-5 text-background" strokeWidth={3} />

@@ -1,30 +1,34 @@
 # 🎬 CineWave: AI-Powered Full-Stack Movie Ecosystem
 
-![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)
-![Next.js](https://img.shields.io/badge/Next.js-15+-black.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-0064a5.svg)
-![Docker](https://img.shields.io/badge/Docker-Multi--Stage-2496ED.svg)
+![CineWave Hero Banner](https://antigravity-artifacts.s3.amazonaws.com/1e795bef-7630-4f19-a294-4f2a630eb858/cinewave_hero_banner_1776686670263.png)
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.12+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Next.js-15+-black.svg?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16+-0064a5.svg?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Docker-Multi--Stage-2496ED.svg?style=for-the-badge&logo=docker&logoColor=white" alt="Docker" />
+</p>
 
 CineWave is a high-performance, asynchronous movie tracking and recommendation platform. It features a stunning **Next.js** dashboard with a Glassmorphism design and is powered by **Eco**, a personalized AI assistant that understands your cinematic taste.
 
-The entire application (Frontend + Backend) is seamlessly unified into a single deployment pipeline.
-
 ---
 
-## 🚀 Key Features
+## ✨ Key Features
 
-- **Unified Full-Stack Architecture:** The Next.js frontend is statically exported and served directly by the FastAPI backend, eliminating CORS issues and simplifying deployment.
-- **Personalized AI (Eco):** A dedicated AI persona that analyzes your movie library to provide deep insights and explain why certain movies are recommended.
-- **Social & Discovery Ecosystem:** 
+- **🛡️ Secure & Modern API Architecture:** Recently refactored to eliminate redundant path parameters and enforce direct identity-based access (removing IDOR risks).
+- **🚀 Unified Full-Stack Architecture:** The Next.js frontend is statically exported and served directly by the FastAPI backend, eliminating CORS issues and simplifying deployment.
+- **🤖 Personalized AI (Eco):** A dedicated AI persona that analyzes your movie library to provide deep insights and explain why certain movies are recommended.
+- **🌐 Social & Discovery Ecosystem:** 
   - **Direct Messaging:** Real-time chat with support for message editing, deletion, and status tracking.
   - **Interaction Requests:** A privacy-first layer where new conversations require recipient approval.
   - **Similar Minds:** An advanced discovery algorithm that matches users based on cinematic taste percentages.
   - **Rich User Profiles:** Public profiles showcasing users' favorite movies, genres, and real-time activity status.
-- **Glassmorphism UI:** A premium, state-of-the-art dashboard built with Next.js, Framer Motion, and Tailwind CSS.
-- **Robust Database Management:** Powered by PostgreSQL and SQLAlchemy 2.0 (Async), with schema versioning strictly managed by **Alembic**.
-- **Multi-Stage Docker Pipeline:** A highly optimized Docker build that securely compiles the Node.js frontend and packages it into a lightweight Python container.
-- **Dual-Layer Caching:** Zustand-based caching on the client and Custom Async TTL Cache on the server protect against API rate limits and optimize CPU load.
+- **🎨 Premium UI:** A premium, state-of-the-art dashboard built with Next.js, Framer Motion, and Tailwind CSS.
+- **🗄️ Robust Database Management:** Powered by PostgreSQL and SQLAlchemy 2.0 (Async), with schema versioning strictly managed by **Alembic**.
+- **🐳 Multi-Stage Docker Pipeline:** A highly optimized Docker build that securely compiles the Node.js frontend and packages it into a lightweight Python container.
+
+---
 
 ## 🛠 Tech Stack
 
@@ -33,6 +37,15 @@ The entire application (Frontend + Backend) is seamlessly unified into a single 
 - **Migrations:** Alembic
 - **Frontend:** Next.js 15, TypeScript, Tailwind CSS, Zustand, Framer Motion
 - **AI Providers:** Google Gemini (Primary), Groq/Llama-3 (Fallback)
+
+---
+
+## 🚀 Recent Improvements
+
+- **Identity-First Security:** Refactored `movies`, `users`, and `social` routers to use authenticated identity directly from tokens, eliminating the need for `username` in URL paths.
+- **Optimized Auth Context:** Added user IDs to the global JWT context, reducing database lookups across all protected routes.
+- **Enhanced Reliability:** Fixed logical errors in TMDB and Resilience services, ensuring the system gracefully handles API failures.
+- **Comprehensive Testing:** Added full-stack integration tests covering the new secure router architecture.
 
 ---
 
@@ -96,8 +109,6 @@ Access the live application at: `http://localhost:8000/ui/`
 ---
 
 ## 🛡️ Security & Performance Hardening
-
-CineWave is engineered for production-grade reliability:
 
 - **Server-Side Token Revocation:** JWTs are immediately invalidated upon logout using a server-side async cache blacklist.
 - **Optimized Indices:** Database tables use targeted foreign-key indexing (O(1) lookups) to prevent full-table scans.

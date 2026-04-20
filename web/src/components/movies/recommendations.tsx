@@ -34,27 +34,22 @@ export function RecommendationsDashboard() {
   const [selectedMovie, setSelectedMovie] = useState<any | null>(null);
 
   useEffect(() => {
-    if (user?.username) {
-      fetchRecommendations(user.username);
-    }
-  }, [user, fetchRecommendations]);
+    fetchRecommendations();
+  }, [fetchRecommendations]);
 
   const handleRefresh = () => {
-    if (user?.username) {
-      fetchRecommendations(user.username, true);
-      toast.success("Refreshing recommendations with Eco...", {
-        icon: <Sparkles className="w-4 h-4 text-primary" />,
-      });
-    }
+    fetchRecommendations(true);
+    toast.success("Refreshing recommendations with Eco...", {
+      icon: <Sparkles className="w-4 h-4 text-primary" />,
+    });
   };
 
   const handleTrackMovie = async (movie: any) => {
-    if (!user?.username) return;
     const tmdbId = movie.tmdb_id || movie.id;
     if (trackingId === tmdbId || trackedIds.has(tmdbId)) return;
     setTrackingId(tmdbId);
     try {
-      await movieApi.addMovie(user.username, { tmdb_id: tmdbId });
+      await movieApi.addMovie({ tmdb_id: tmdbId });
       toast.success(`${movie.title} added to your library!`);
 
       // Remove from recommendations list immediately

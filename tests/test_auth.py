@@ -1,15 +1,3 @@
-"""
-tests/test_auth.py — End-to-End Authentication Tests
-
-Validates the full authentication lifecycle:
-    1. User registration    (POST /users)
-    2. User login           (POST /login)
-    3. Protected route access with a valid token
-    4. Ownership enforcement (accessing another user → 403)
-
-Run with:
-    python -m pytest tests/ -v
-"""
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -18,9 +6,15 @@ from main import app
 # ---------------------------------------------------------------------------
 # Test Constants
 # ---------------------------------------------------------------------------
-TEST_USERNAME = "pytes_user"
-TEST_PASSWORD = "secure123"
-TEST_EMAIL = "pytes@test.com"
+import random
+import string
+
+def get_random_string(length=8):
+    return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
+
+TEST_USERNAME = "user_" + get_random_string()
+TEST_PASSWORD = "SecurePassword123!"
+TEST_EMAIL = TEST_USERNAME + "@test.com"
 
 
 @pytest.mark.asyncio
@@ -53,29 +47,24 @@ async def test_register_and_login():
             "/login", data={"username": TEST_USERNAME, "password": TEST_PASSWORD}
         )
         assert login_res.status_code == 200
-        assert "access_token" in login_res.json()
-
         token = login_res.json()["access_token"]
+        assert token is not None
 
         # -------------------------------------------------------------------
-        # Step 3: Access own protected profile route
+        # Step 3: Access protected route (/users/me)
         # -------------------------------------------------------------------
-        user_res = await client.get(
-            f"/users/{TEST_USERNAME}", headers={"Authorization": f"Bearer {token}"}
-        )
-        assert user_res.status_code == 200
-        assert user_res.json()["data"]["user"]["username"] == TEST_USERNAME
+        me_res = await client.get("/users/me", headers={"Authorization": f"Bearer {token}"})
+        assert me_res.status_code == 200
+        assert me_res.json()["data"]["user"]["username"] == TEST_USERNAME
 
         # -------------------------------------------------------------------
-        # Step 4: Verify ownership enforcement — accessing another user → 403
+        # Step 4: Verify that path-based access is gone → 404 or 405
         # -------------------------------------------------------------------
         other_res = await client.get("/users/admin", headers={"Authorization": f"Bearer {token}"})
-        assert other_res.status_code == 403
+        assert other_res.status_code in [404, 405]
 
         # -------------------------------------------------------------------
-        # Teardown: Soft-delete the test user via HTTP
+        # Teardown: Soft-delete the test user via HTTP (using new path)
         # -------------------------------------------------------------------
-        await client.delete(
-            f"/users/{TEST_USERNAME}",
-            headers={"Authorization": f"Bearer {token}"},
-        )
+        del_res = await client.delete("/users/", headers={"Authorization": f"Bearer {token}"})
+        assert del_res.status_code == 200

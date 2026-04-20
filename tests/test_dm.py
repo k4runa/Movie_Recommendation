@@ -10,17 +10,17 @@ async def test_dm_flow():
         # 1. Create two users
         import uuid
         uid = str(uuid.uuid4())[:8]
-        user1 = {"username": f"dm_user1_{uid}", "password": "password123", "email": f"dm1_{uid}@test.com"}
-        user2 = {"username": f"dm_user2_{uid}", "password": "password123", "email": f"dm2_{uid}@test.com"}
+        user1 = {"username": f"dm_user1_{uid}", "password": "SecurePassword123!", "email": f"dm1_{uid}@test.com"}
+        user2 = {"username": f"dm_user2_{uid}", "password": "SecurePassword123!", "email": f"dm2_{uid}@test.com"}
         
         await client.post("/users", json=user1)
         await client.post("/users", json=user2)
         
         # 2. Login both
-        login1 = await client.post("/login", data={"username": f"dm_user1_{uid}", "password": "password123"})
+        login1 = await client.post("/login", data={"username": f"dm_user1_{uid}", "password": "SecurePassword123!"})
         token1 = login1.json()["access_token"]
         
-        login2 = await client.post("/login", data={"username": f"dm_user2_{uid}", "password": "password123"})
+        login2 = await client.post("/login", data={"username": f"dm_user2_{uid}", "password": "SecurePassword123!"})
         token2 = login2.json()["access_token"]
         
         # Get user2 ID
@@ -33,7 +33,26 @@ async def test_dm_flow():
         assert send_res.status_code == 200
         assert send_res.json()["success"] == True
         
-        # 4. User2 checks conversations
+        # 4. User2 checks conversations (Message Requests)
+        # Initially it should be in PENDING for User2
+        conv_res_pending = await client.get("/social/conversations?status=PENDING", headers={"Authorization": f"Bearer {token2}"})
+        assert conv_res_pending.status_code == 200
+        pending_convs = conv_res_pending.json()["data"]["conversations"]
+        assert len(pending_convs) > 0
+        assert pending_convs[0]["participant"]["username"] == user1["username"]
+        
+        # User1 should see it in ACCEPTED as PENDING_SENT
+        conv_res_sent = await client.get("/social/conversations?status=ACCEPTED", headers={"Authorization": f"Bearer {token1}"})
+        assert len(conv_res_sent.json()["data"]["conversations"]) > 0
+        
+        # User2 accepts the request
+        me1 = await client.get("/users/me", headers={"Authorization": f"Bearer {token1}"})
+        user1_id = me1.json()["data"]["user"]["id"]
+        # Corrected: PATCH /social/requests/{id}/accept
+        accept_res = await client.patch(f"/social/requests/{user1_id}/accept", headers={"Authorization": f"Bearer {token2}"})
+        assert accept_res.status_code == 200
+        
+        # Now it should be in ACCEPTED for User2
         conv_res = await client.get("/social/conversations", headers={"Authorization": f"Bearer {token2}"})
         assert conv_res.status_code == 200
         conversations = conv_res.json()["data"]["conversations"]
@@ -42,12 +61,6 @@ async def test_dm_flow():
         assert conversations[0]["unread_count"] == 1
         
         # 5. User2 reads messages
-        # me1 = await client.get("/users/me", headers={"Authorization": f"Bearer {token1}"})
-        # Wait, the endpoint is /messages/{other_user_id}
-        # User2 checking history with User1
-        me1 = await client.get("/users/me", headers={"Authorization": f"Bearer {token1}"})
-        user1_id = me1.json()["data"]["user"]["id"]
-        
         history_res = await client.get(f"/social/messages/{user1_id}", headers={"Authorization": f"Bearer {token2}"})
         assert history_res.status_code == 200
         messages = history_res.json()["data"]["messages"]
@@ -73,15 +86,6 @@ async def test_dm_flow():
         # User2 should still see the conversation (logical deletion is individual)
         conv_res4 = await client.get("/social/conversations", headers={"Authorization": f"Bearer {token2}"})
         assert len(conv_res4.json()["data"]["conversations"]) == 1
-
-        # 8. Rate Limiting Test (Basic)
-        # We try to send 31 messages quickly
-        for i in range(35):
-            await client.post("/social/message", json=msg_payload, headers={"Authorization": f"Bearer {token1}"})
-        
-        # The 31st+ message should eventually fail if rate limit hits
-        # Note: SlowAPI might not trigger in tests depending on setup, but we check.
-        # However, for a real test we'd need to ensure limiter is on.
         
         # Cleanup
         await client.delete(f"/users/{user1['username']}", headers={"Authorization": f"Bearer {token1}"})
