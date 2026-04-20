@@ -1,6 +1,5 @@
 # 🎬 CineWave: AI-Powered Full-Stack Movie Ecosystem
 
-![CineWave Hero Banner](https://antigravity-artifacts.s3.amazonaws.com/1e795bef-7630-4f19-a294-4f2a630eb858/cinewave_hero_banner_1776686670263.png)
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.12+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python" />
