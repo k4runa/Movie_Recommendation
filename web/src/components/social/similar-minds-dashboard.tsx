@@ -248,10 +248,10 @@ export const UserProfileModal = ({
                   </span>
                 ))}
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                {profile.age && <span>Age: {profile.age}</span>}
-                {profile.gender && <span>Gender: {profile.gender}</span>}
-                {profile.location && <span>Location: {profile.location}</span>}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[8px] font-black text-muted-foreground uppercase tracking-[0.15em]">
+                {profile.age && <span className="whitespace-nowrap">Age: {profile.age}</span>}
+                {profile.gender && <span className="whitespace-nowrap">Gender: {profile.gender}</span>}
+                {profile.location && <span className="whitespace-nowrap">Location: {profile.location}</span>}
               </div>
             </div>
           </div>
