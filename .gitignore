@@ -63,3 +63,4 @@ htmlcov/
 
 # --- Audit (contains sensitive findings) ---
 AUDIT_REPORT.md
+uploads/
