@@ -52,11 +52,11 @@ export const FavoritesDashboard = () => {
 
   return (
     <div className="space-y-12">
-      <div className="bg-card border border-border rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden shadow-sm">
+      <div className="bg-card border border-border rounded-2xl p-8 md:p-12 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-8 text-primary/5">
           <Star className="w-48 h-48 rotate-12" fill="currentColor" />
         </div>
-        
+
         <div className="relative z-10 space-y-4 max-w-2xl">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-2 rounded-xl">
@@ -76,25 +76,25 @@ export const FavoritesDashboard = () => {
           const fav = favorites[index];
           return (
             <div key={index} className="space-y-4">
-              <div 
-                className={`aspect-[2/3] rounded-[2rem] border-2 border-dashed transition-all duration-500 overflow-hidden relative group
-                  ${fav ? "border-transparent shadow-2xl" : "border-border bg-accent/20 hover:bg-accent/40"}`}
+              <div
+                className={`aspect-[2/3] rounded-2xl border-2 border-dashed transition-all duration-500 overflow-hidden relative group
+                  ${fav ? "border-transparent" : "border-border bg-accent/20 hover:bg-accent/40"}`}
               >
                 {fav ? (
                   <>
                     {fav.poster_url ? (
-                      <img 
-                        src={fav.poster_url} 
-                        alt={fav.title} 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                      <img
+                        src={fav.poster_url}
+                        alt={fav.title}
+                        className="w-full h-full object-cover transition-all"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center p-6 text-center bg-card">
-                         <span className="text-xl font-black tracking-tighter">{fav.title}</span>
+                        <span className="text-xl font-black tracking-tighter">{fav.title}</span>
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-6">
-                      <button 
+                      <button
                         onClick={() => removeFavorite(fav.id)}
                         className="bg-destructive text-destructive-foreground p-4 rounded-2xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shadow-xl"
                       >

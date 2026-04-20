@@ -62,12 +62,12 @@ export function MovieDetailsModal({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-4xl bg-card/60 backdrop-blur-2xl border border-border/50 rounded-[3rem] overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh]"
+            className="relative w-full max-w-4xl bg-card border border-border rounded-2xl overflow-hidden shadow-xl flex flex-col md:flex-row max-h-[90vh]"
           >
             {/* Close Button */}
             <button
               onClick={onClose}
-              className="absolute top-6 right-6 z-20 p-3 bg-background/50 backdrop-blur-md rounded-2xl text-muted-foreground hover:text-foreground hover:scale-110 transition-all border border-border/20 shadow-lg"
+              className="absolute top-6 right-6 z-20 p-3 bg-background border border-border rounded-xl text-muted-foreground hover:text-foreground hover:-translate-y-0.5 transition-all shadow-sm"
             >
               <X className="w-6 h-6" />
             </button>
@@ -95,7 +95,7 @@ export function MovieDetailsModal({
             <div className="flex-1 p-8 md:p-12 flex flex-col gap-8 overflow-y-auto">
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="px-3 py-1 bg-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-primary/20">
+                  <span className="px-3 py-1 bg-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.2em] rounded-md border border-primary/20">
                     {movie.media_type || "Movie"}
                   </span>
                   <div className="flex items-center gap-1 text-yellow-500 font-black text-sm">
@@ -160,7 +160,7 @@ export function MovieDetailsModal({
                     onAdd?.(movie);
                   }}
                   disabled={isAdding || isTracked}
-                  className={`flex-1 h-14 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl ${isTracked ? "bg-primary/10 text-primary border border-primary/20 cursor-default" : "bg-primary text-primary-foreground hover:scale-[1.02] active:scale-[0.98]"}`}
+                  className={`flex-1 h-14 rounded-xl font-black text-sm uppercase tracking-widest transition-all shadow-sm ${isTracked ? "bg-primary/10 text-primary border border-primary/20 cursor-default" : "bg-primary text-primary-foreground hover:-translate-y-0.5 active:scale-[0.98]"}`}
                 >
                   {isAdding ? (
                     <Loader2 className="w-5 h-5 animate-spin" />

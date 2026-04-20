@@ -79,7 +79,7 @@ export function RecommendationsDashboard() {
 
   if (recommendations.length === 0) {
     return (
-      <div className="p-16 border-2 border-dashed border-border/50 rounded-[3rem] flex flex-col items-center justify-center text-center space-y-6 bg-card/20 md:backdrop-blur-xl">
+      <div className="p-16 border-2 border-dashed border-border/50 rounded-2xl flex flex-col items-center justify-center text-center space-y-6 bg-card/20 md:backdrop-blur-xl">
         <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20">
           <Sparkles className="w-10 h-10 text-primary" />
         </div>
@@ -125,17 +125,17 @@ export function RecommendationsDashboard() {
             <Card
               key={idx}
               onClick={() => setSelectedMovie(movie)}
-              className="bg-card/40 md:backdrop-blur-md border border-border/50 p-4 rounded-[2rem] flex flex-col gap-4 hover:bg-card/60 transition-all hover:-translate-y-2 hover:border-zinc-700 overflow-hidden group cursor-pointer"
+              className="bg-card/40 md:backdrop-blur-md border border-border/50 p-4 rounded-2xl flex flex-col gap-4 hover:bg-card/60 transition-all hover:-translate-y-1 hover:border-primary/50 overflow-hidden group cursor-pointer"
             >
               {/* Image Section */}
-              <div className="w-full aspect-[2/3] bg-accent/30 rounded-[1.5rem] overflow-hidden relative border border-border/10">
+              <div className="w-full aspect-[2/3] bg-accent/30 rounded-xl overflow-hidden relative border border-border/10">
                 <img
                   src={
                     movie.poster_url ||
                     `https://images.placeholders.dev/?width=500&height=750&text=${encodeURIComponent(movie.title)}&bgColor=%2318181b&textColor=%2371717a`
                   }
                   alt={movie.title}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  className="w-full h-full object-cover transition-all"
                 />
 
                 <div className="absolute top-3 right-3 bg-background/60 md:backdrop-blur-xl border border-border/20 px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-black text-yellow-500 shadow-xl">

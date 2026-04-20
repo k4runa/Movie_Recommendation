@@ -89,7 +89,7 @@ export const SimilarMindsDashboard = ({ onTabChange }: { onTabChange?: (tab: "mo
             <motion.div
               key={match.target_user.id}
               whileHover={{ y: -5 }}
-              className="bg-card border border-border rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all cursor-pointer group relative overflow-hidden"
+              className="bg-card border border-border rounded-2xl p-6 transition-all cursor-pointer group relative overflow-hidden hover:border-primary/50 hover:-translate-y-1"
               onClick={() => setSelectedUser(match.target_user.id)}
             >
               <div className="absolute top-0 right-0 p-4">
@@ -99,7 +99,7 @@ export const SimilarMindsDashboard = ({ onTabChange }: { onTabChange?: (tab: "mo
               </div>
 
               <div className="flex items-center gap-4 mb-6 pr-16">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary-foreground flex items-center justify-center text-white font-black text-xl shadow-lg overflow-hidden border border-border">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-foreground flex items-center justify-center text-white font-black text-xl overflow-hidden border border-border">
                   {match.target_user.avatar_url ? (
                     <img src={getFullUrl(match.target_user.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -201,7 +201,7 @@ export const UserProfileModal = ({
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="relative bg-card border border-border w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden"
+        className="relative bg-card border border-border w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden"
       >
         {/* New Message Button in Modal Header */}
         <div className="absolute top-6 right-6 z-10">
@@ -211,7 +211,7 @@ export const UserProfileModal = ({
               if (onTabChange) onTabChange("messages");
               onClose();
             }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-full font-black text-[10px] uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-black text-[10px] uppercase tracking-widest transition-all hover:-translate-y-0.5 active:scale-95"
           >
             <Send className="w-3 h-3" />
             Send Message
@@ -222,7 +222,7 @@ export const UserProfileModal = ({
         
         <div className="px-8 pb-8 -mt-12">
           <div className="flex flex-col md:flex-row md:items-end gap-6 mb-8">
-            <div className="size-24 rounded-[2rem] bg-gradient-to-br from-primary to-primary-foreground border-4 border-card flex items-center justify-center text-white font-black text-4xl shadow-2xl overflow-hidden">
+            <div className="size-24 rounded-2xl bg-gradient-to-br from-primary to-primary-foreground border-4 border-card flex items-center justify-center text-white font-black text-4xl overflow-hidden">
               {profile.avatar_url ? (
                 <img src={getFullUrl(profile.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
               ) : (

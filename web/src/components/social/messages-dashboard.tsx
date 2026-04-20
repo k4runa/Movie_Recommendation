@@ -3,13 +3,13 @@
 import React, { useEffect, useState, useRef } from "react";
 import { socialApi, getFullUrl } from "@/lib/api";
 import { useAuthStore, useSocialStore } from "@/lib/store";
-import { 
-  Search, 
-  Send, 
-  MoreVertical, 
-  Trash2, 
-  MessageSquare, 
-  Loader2, 
+import {
+  Search,
+  Send,
+  MoreVertical,
+  Trash2,
+  MessageSquare,
+  Loader2,
   ChevronLeft,
   Info,
   Clock,
@@ -59,7 +59,7 @@ export const MessagesDashboard = () => {
   const [activeUser, setActiveUser] = useState<any>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, messageId: number, content: string } | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,12 +72,12 @@ export const MessagesDashboard = () => {
     const targetStatus = statusOverride || activeStatus;
     try {
       const res = await socialApi.getConversations(targetStatus);
-      
+
       // Safety: only update state if we are still looking at the same status
       if (targetStatus === activeStatus || statusOverride) {
         const convs = res.data?.data?.conversations || [];
         setConversations(convs);
-        
+
         // Calculate total unread
         const total = convs.reduce((acc: number, curr: any) => acc + curr.unread_count, 0);
         setUnreadTotal(total);
@@ -99,11 +99,11 @@ export const MessagesDashboard = () => {
     try {
       const res = await socialApi.getMessages(otherId);
       const newMessages = res.data?.data?.messages || [];
-      
+
       setMessages(prev => {
         // Simple optimization: only update if lengths differ or last message ID differs
-        if (prev.length === newMessages.length && 
-            (prev.length === 0 || prev[prev.length - 1].id === newMessages[newMessages.length - 1].id)) {
+        if (prev.length === newMessages.length &&
+          (prev.length === 0 || prev[prev.length - 1].id === newMessages[newMessages.length - 1].id)) {
           return prev;
         }
         return newMessages;
@@ -214,7 +214,7 @@ export const MessagesDashboard = () => {
     }
   };
 
-  const filteredConversations = conversations.filter(c => 
+  const filteredConversations = conversations.filter(c =>
     c.participant.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.participant.nickname && c.participant.nickname.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -230,8 +230,8 @@ export const MessagesDashboard = () => {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-[550px] border border-border rounded-[2.5rem] bg-card overflow-hidden shadow-2xl relative">
-      
+    <div className="flex flex-col md:flex-row h-[600px] border border-border rounded-2xl bg-card overflow-hidden relative">
+
       {/* Sidebar - Conversation List */}
       <div className={cn(
         "w-full md:w-80 border-r border-border flex flex-col bg-accent/10",
@@ -239,34 +239,36 @@ export const MessagesDashboard = () => {
       )}>
         <div className="p-6 border-b border-border space-y-4">
           {/* Status Tabs */}
-          <div className="flex bg-accent/50 p-1 rounded-2xl">
-            <button 
-              onClick={() => { 
-                setActiveStatus("ACCEPTED"); 
+          <div className="flex border-b border-border gap-6 px-2">
+            <button
+              onClick={() => {
+                setActiveStatus("ACCEPTED");
                 setActiveChatId(null);
                 setConversations([]);
               }}
               className={cn(
-                "flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all",
-                activeStatus === "ACCEPTED" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                "pb-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative",
+                activeStatus === "ACCEPTED" ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
               Inbox
+              {activeStatus === "ACCEPTED" && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
             </button>
-            <button 
-              onClick={() => { 
-                setActiveStatus("PENDING"); 
+            <button
+              onClick={() => {
+                setActiveStatus("PENDING");
                 setActiveChatId(null);
                 setConversations([]);
               }}
               className={cn(
-                "flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all relative",
-                activeStatus === "PENDING" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                "pb-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative",
+                activeStatus === "PENDING" ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
               Requests
+              {activeStatus === "PENDING" && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />}
               {requestCount > 0 && (
-                <span className="absolute -top-1 -right-1 size-4 bg-primary text-primary-foreground text-[8px] flex items-center justify-center rounded-full border-2 border-background">
+                <span className="absolute -top-1 -right-4 size-4 bg-primary text-primary-foreground text-[8px] flex items-center justify-center rounded-full">
                   {requestCount}
                 </span>
               )}
@@ -275,7 +277,7 @@ export const MessagesDashboard = () => {
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input 
+            <input
               type="text"
               placeholder="Search..."
               value={searchQuery}
@@ -295,18 +297,18 @@ export const MessagesDashboard = () => {
             </div>
           ) : (
             filteredConversations.map((conv) => (
-              <button
+              <div
                 key={conv.participant.id}
                 onClick={() => setActiveChatId(conv.participant.id)}
                 className={cn(
-                  "w-full flex items-center gap-3 p-3 rounded-2xl transition-all group",
-                  activeChatId === conv.participant.id 
-                    ? "bg-card border border-border shadow-md" 
-                    : "hover:bg-accent/50"
+                  "p-4 cursor-pointer transition-all border border-transparent",
+                  activeChatId === conv.participant.id
+                    ? "bg-accent/50 border-border"
+                    : "hover:bg-accent/30 hover:border-border/50 hover:-translate-y-0.5"
                 )}
               >
                 <div className="relative">
-                  <div className="size-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-border overflow-hidden flex items-center justify-center text-primary font-black uppercase shadow-sm">
+                  <div className="size-12 rounded bg-gradient-to-br from-primary/20 to-primary/5 border border-border overflow-hidden flex items-center justify-center text-primary font-black uppercase">
                     {conv.participant.avatar_url ? (
                       <img src={getFullUrl(conv.participant.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
@@ -355,11 +357,11 @@ export const MessagesDashboard = () => {
           <>
             {/* Chat Header */}
             <div className="h-20 border-b border-border px-6 flex items-center justify-between bg-card/50 backdrop-blur-md sticky top-0 z-10">
-              <div 
+              <div
                 className="flex items-center gap-4 cursor-pointer group"
                 onClick={() => setIsProfileOpen(true)}
               >
-                <button 
+                <button
                   onClick={(e) => { e.stopPropagation(); setActiveChatId(null); }}
                   className="md:hidden p-2 hover:bg-accent rounded-xl"
                 >
@@ -389,7 +391,7 @@ export const MessagesDashboard = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                <button 
+                <button
                   onClick={() => handleDeleteConversation(activeChatId)}
                   className="p-2.5 hover:bg-destructive/10 hover:text-destructive rounded-xl transition-all group"
                   title="Delete History"
@@ -417,13 +419,13 @@ export const MessagesDashboard = () => {
               ) : (
                 messages.map((msg, idx) => {
                   const isOwn = msg.sender_id === user?.id;
-                  const prevMsg = idx > 0 ? messages[idx-1] : null;
+                  const prevMsg = idx > 0 ? messages[idx - 1] : null;
                   const isSequence = prevMsg && prevMsg.sender_id === msg.sender_id;
                   const isEditing = editingId === msg.id;
 
                   return (
-                    <div 
-                      key={msg.id} 
+                    <div
+                      key={msg.id}
                       className={cn(
                         "flex flex-col max-w-[80%]",
                         isOwn ? "ml-auto items-end" : "mr-auto items-start",
@@ -447,8 +449,8 @@ export const MessagesDashboard = () => {
                         }}
                         className={cn(
                           "px-4 py-2.5 rounded-2xl text-xs font-medium shadow-sm relative group cursor-default transition-all",
-                          isOwn 
-                            ? "bg-primary text-primary-foreground rounded-tr-none hover:brightness-110" 
+                          isOwn
+                            ? "bg-primary text-primary-foreground rounded-tr-none hover:brightness-110"
                             : "bg-card border border-border text-foreground rounded-tl-none"
                         )}
                       >
@@ -475,7 +477,7 @@ export const MessagesDashboard = () => {
                             {msg.content}
                           </>
                         )}
-                        
+
                         {isOwn && idx === messages.length - 1 && (
                           <div className="absolute -bottom-5 right-1 flex items-center gap-1 opacity-50">
                             <span className="text-[8px] font-black uppercase tracking-widest">
@@ -497,18 +499,18 @@ export const MessagesDashboard = () => {
                 <div className="max-w-md mx-auto space-y-2">
                   <h4 className="text-lg font-black tracking-tight">Message Request</h4>
                   <p className="text-xs text-muted-foreground font-medium">
-                    {activeUser?.nickname || activeUser?.username || selectedConv?.participant?.nickname || selectedConv?.participant?.username} wants to chat. 
+                    {activeUser?.nickname || activeUser?.username || selectedConv?.participant?.nickname || selectedConv?.participant?.username} wants to chat.
                     They can only see if you've read the message once you accept.
                   </p>
                 </div>
                 <div className="flex items-center justify-center gap-4">
-                  <button 
+                  <button
                     onClick={() => handleConversationRequest(activeChatId, "decline")}
                     className="px-8 py-3 bg-card border border-border rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-destructive/10 hover:text-destructive transition-all"
                   >
                     Decline
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleConversationRequest(activeChatId, "accept")}
                     className="px-10 py-3 bg-primary text-primary-foreground rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all"
                   >
@@ -542,7 +544,7 @@ export const MessagesDashboard = () => {
                     className={cn(
                       "size-12 rounded-2xl flex items-center justify-center transition-all shadow-lg active:scale-95",
                       newMessage.trim() && selectedConv?.status !== "PENDING" && selectedConv?.status !== "PENDING_SENT"
-                        ? "bg-primary text-primary-foreground shadow-primary/20 hover:scale-105" 
+                        ? "bg-primary text-primary-foreground shadow-primary/20 hover:scale-105"
                         : "bg-accent text-muted-foreground grayscale cursor-not-allowed"
                     )}
                   >
@@ -553,11 +555,10 @@ export const MessagesDashboard = () => {
             )}
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-accent/[0.01]">
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
             <div className="relative mb-8">
-              <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full" />
-              <div className="relative size-24 rounded-[2.5rem] bg-card border border-border shadow-2xl flex items-center justify-center text-primary">
-                <MessageSquare className="w-10 h-10" />
+              <div className="relative size-20 rounded-2xl bg-card border border-border flex items-center justify-center text-primary">
+                <MessageSquare className="w-8 h-8" />
               </div>
             </div>
             <h3 className="text-2xl font-black tracking-tighter mb-3">Your Messages</h3>
@@ -584,8 +585,8 @@ export const MessagesDashboard = () => {
 
       <AnimatePresence>
         {isProfileOpen && activeChatId && (
-          <UserProfileModal 
-            userId={activeChatId} 
+          <UserProfileModal
+            userId={activeChatId}
             onClose={() => setIsProfileOpen(false)}
             setActiveChatId={setActiveChatId}
           />
@@ -632,7 +633,7 @@ export const MessagesDashboard = () => {
       <AnimatePresence>
         {deleteTargetId && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

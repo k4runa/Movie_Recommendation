@@ -51,37 +51,36 @@ export const SocialDrawer = ({ user, onClose }: { user: any | null, onClose: () 
             className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60]"
           />
 
-          {/* Drawer */}
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-card border-l border-border z-[70] flex flex-col shadow-2xl"
+            className="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-card border-l border-border z-[70] flex flex-col"
           >
-            {/* Header */}
-            <div className="p-6 border-b border-border flex items-center justify-between bg-background/50 backdrop-blur-md">
+            <div className="p-6 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="size-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                <div className="size-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
                   <User className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h2 className="text-lg font-black tracking-tighter uppercase">{user.username}</h2>
                   <div className="flex items-center gap-2">
-                    <div className="size-2 rounded-full bg-green-500 animate-pulse" />
+                    <div className="size-2 rounded-full bg-green-500" />
                     <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Active Now</span>
                   </div>
                 </div>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-accent rounded-xl transition-colors">
+              <button
+                onClick={onClose}
+                className="p-3 bg-background border border-border rounded-xl text-muted-foreground hover:text-foreground hover:-translate-y-0.5 transition-all"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Chat Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-              {/* Match Insight */}
-              <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl mb-8">
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl mb-8">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="w-3.5 h-3.5 text-primary" />
                   <span className="text-[10px] font-black uppercase tracking-widest text-primary">Insight</span>
@@ -96,8 +95,8 @@ export const SocialDrawer = ({ user, onClose }: { user: any | null, onClose: () 
                 return (
                   <div key={msg.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
                     <div className={cn(
-                      "max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed",
-                      isMe ? "bg-primary text-primary-foreground rounded-tr-none" : "bg-accent text-foreground rounded-tl-none"
+                      "max-w-[80%] p-4 rounded-xl text-sm leading-relaxed transition-all hover:-translate-y-0.5",
+                      isMe ? "bg-primary text-primary-foreground" : "bg-card border border-border"
                     )}>
                       {msg.content}
                     </div>
@@ -110,14 +109,13 @@ export const SocialDrawer = ({ user, onClose }: { user: any | null, onClose: () 
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input Area */}
-            <div className="p-6 border-t border-border bg-background/50">
+            <div className="p-6 border-t border-border bg-background">
               <div className="relative group">
                 <Textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Type a message..."
-                  className="min-h-[60px] pr-12 rounded-2xl border-border/50 bg-card/50 focus:bg-card transition-all"
+                  className="min-h-[60px] pr-12 rounded-xl border-border bg-background transition-all"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -128,7 +126,7 @@ export const SocialDrawer = ({ user, onClose }: { user: any | null, onClose: () 
                 <button
                   onClick={handleSend}
                   disabled={!content.trim()}
-                  className="absolute right-3 bottom-3 p-2 bg-primary text-primary-foreground rounded-xl disabled:opacity-50 hover:scale-105 active:scale-95 transition-all"
+                  className="absolute right-3 bottom-3 p-2 bg-primary text-primary-foreground rounded-lg disabled:opacity-50 hover:-translate-y-0.5 transition-all"
                 >
                   <Send className="w-4 h-4" />
                 </button>
