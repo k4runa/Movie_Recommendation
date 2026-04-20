@@ -323,7 +323,7 @@ class SimilarityMatch(Base):
     target_id:          Mapped[int]                 =   mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     score:              Mapped[float]               =   mapped_column(nullable=False)
     reasons:            Mapped[Optional[str]]       =   mapped_column(String, nullable=True) # e.g. "Both love Horror"
-    last_updated:       Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
 
 
 # ---------------------------------------------------------------------------
@@ -1473,7 +1473,7 @@ class SocialManager:
                     else:
                         match.score = total_score
                         match.reasons = ", ".join(reasons)
-                        match.last_updated = datetime.now(timezone.utc).isoformat()
+                        match.updated_at = datetime.now(timezone.utc).isoformat()
 
             await session.commit()
 
