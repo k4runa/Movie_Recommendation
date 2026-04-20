@@ -171,6 +171,11 @@ async def health_check():
 # Served at /ui — the `html=True` flag makes FastAPI serve index.html for
 # directory-level requests, enabling client-side routing.
 # ---------------------------------------------------------------------------
+# Ensure uploads directory exists to avoid crashes on startup
+import os
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/ui", StaticFiles(directory="frontend", html=True), name="frontend")
 
