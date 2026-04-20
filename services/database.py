@@ -28,8 +28,8 @@ from sqlalchemy import (
     func,
     UniqueConstraint,
 )
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession, AsyncEngine
-from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column, AsyncSessionMaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from fastapi.concurrency import run_in_threadpool
 from functools import wraps
 from typing import List, Optional, Any
@@ -84,8 +84,8 @@ class Base(DeclarativeBase):
 # We define a single engine and session factory to be shared across all
 # managers. This is critical for performance and memory management.
 # ---------------------------------------------------------------------------
-_engine:        AsyncEngine         = None
-_session_maker: AsyncSessionMaker   = None
+_engine        = None
+_session_maker = None
 
 
 def init_database(db_url: str, echo: bool = False):
