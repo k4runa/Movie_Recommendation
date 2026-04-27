@@ -55,6 +55,9 @@ import QRCode from 'react-native-qrcode-svg';
 import * as NavigationBar from 'expo-navigation-bar';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
+import * as Clipboard from 'expo-clipboard';
+
+const APP_URL = process.env.EXPO_PUBLIC_APP_URL || 'https://ecofil.app';
 // Platform configurations for social links
 // Fallback to LinkIcon if specific brand icons aren't available in current lucide version
 /*const SOCIAL_PLATFORMS: Record<string, { label: string, icon: any, color: string, baseUrl: string }> = {
@@ -272,7 +275,7 @@ export default function ProfileScreen() {
   };
 
   const handleShare = async () => {
-    const profileUrl = `https://ecofil.app/u/${user?.username}`;
+    const profileUrl = `${APP_URL}/u/${user?.username}`;
     try {
       await Share.share({
         message: `Check out my profile: ${profileUrl}`,
@@ -725,7 +728,7 @@ export default function ProfileScreen() {
 
             <View style={styles.qrContainer}>
               <QRCode
-                value={`https://ecofil.app/u/${user?.username}`}
+                value={`${APP_URL}/u/${user?.username}`}
                 size={200}
                 backgroundColor="white"
                 color="black"
@@ -737,14 +740,15 @@ export default function ProfileScreen() {
 
             <TouchableOpacity
               style={styles.copyLinkBtn}
-              onPress={() => {
+              onPress={async () => {
+                await Clipboard.setStringAsync(`${APP_URL}/u/${user?.username}`);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
               }}
             >
               {copied ? <Check size={16} color="#10B981" /> : <Copy size={16} color="#FF4500" />}
               <Text style={[styles.copyLinkText, copied && { color: "#10B981" }]}>
-                {copied ? "Link Copied" : `ecofil.app/u/${user?.username}`}
+                {copied ? "Link Copied" : `${APP_URL.replace('https://', '')}/u/${user?.username}`}
               </Text>
             </TouchableOpacity>
 

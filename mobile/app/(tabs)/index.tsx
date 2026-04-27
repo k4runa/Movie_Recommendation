@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, memo } from "react";
+import { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Star, Plus, Info, Check, CheckCircle2, RefreshCw, Sparkles, Bell } from "lucide-react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -52,13 +52,11 @@ const MovieCard = memo(({
       <Text style={styles.ratingText}>{Number(movie.vote_average || 0).toFixed(1)}</Text>
     </View>
     <TouchableOpacity
-      style={[styles.cardAddButton, isAdded && styles.cardAddedButton, isToggling && styles.cardTogglingButton]}
+      style={[styles.cardAddButton, isAdded && styles.cardAddedButton]}
       onPress={() => onToggle(movie)}
       disabled={isToggling}
     >
-      {isToggling ? (
-        <ActivityIndicator size="small" color="#FF4500" />
-      ) : isAdded ? (
+      {isAdded ? (
         <Check size={16} color="white" />
       ) : (
         <Plus size={16} color="white" />
@@ -93,6 +91,7 @@ const SkeletonLoader = () => (
 export default function HomeScreen() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const insets = useSafeAreaInsets();
 
   const [trending, setTrending] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -105,17 +104,19 @@ export default function HomeScreen() {
   const [addedMovies, setAddedMovies] = useState<Map<number, number>>(new Map());
   const addedMoviesRef = useRef<Map<number, number>>(new Map());
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
+  const togglingIdsRef = useRef<Set<number>>(new Set());
 
   // Toast
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const toastOffset = insets.top + 10;
   const toastY = useRef(new Animated.Value(-100)).current;
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     setToastVisible(true);
     Animated.sequence([
-      Animated.timing(toastY, { toValue: 60, duration: 350, useNativeDriver: true }),
+      Animated.timing(toastY, { toValue: toastOffset, duration: 350, useNativeDriver: true }),
       Animated.delay(1800),
       Animated.timing(toastY, { toValue: -100, duration: 350, useNativeDriver: true }),
     ]).start(() => setToastVisible(false));
@@ -177,13 +178,14 @@ export default function HomeScreen() {
   // ─── Instant optimistic toggle ───────────────────────────────────────────
   const handleToggleMovie = useCallback((movie: any) => {
     const tmdbId = movie.tmdb_id;
-    if (!tmdbId) return; // Guard: trending/recs always have tmdb_id
-    if (togglingIds.has(tmdbId)) return; // Guard: prevent double-tap race
+    if (!tmdbId) return;
+    if (togglingIdsRef.current.has(tmdbId)) return;
 
     const currentId = addedMoviesRef.current.get(tmdbId);
     const isAdding = currentId === undefined;
 
     // 0. Lock this tmdbId against concurrent toggles
+    togglingIdsRef.current.add(tmdbId);
     setTogglingIds(prev => new Set(prev).add(tmdbId));
 
     // 1. Update UI instantly
@@ -236,6 +238,7 @@ export default function HomeScreen() {
         if (isAdding) addedMoviesRef.current.delete(tmdbId);
         else addedMoviesRef.current.set(tmdbId, currentId!);
       } finally {
+        togglingIdsRef.current.delete(tmdbId);
         setTogglingIds(prev => {
           const next = new Set(prev);
           next.delete(tmdbId);
@@ -243,7 +246,7 @@ export default function HomeScreen() {
         });
       }
     })();
-  }, [showToast, togglingIds]);
+  }, [showToast]);
 
   // Stable callbacks passed to MovieCard
   const handlePress = useCallback((m: any) => {
