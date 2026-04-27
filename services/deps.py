@@ -12,7 +12,7 @@ Usage in routers:
 """
 
 import os
-from .database import UserManager, MovieManager, SocialManager, init_database
+from .database import UserManager, MovieManager, SocialManager, AIManager, NotificationManager, TokenManager, init_database
 from dotenv import load_dotenv
 import logging
 from slowapi import Limiter
@@ -39,20 +39,16 @@ limiter = Limiter(key_func=_get_real_ip, enabled=not is_testing)
 # Database URL Resolution
 # ---------------------------------------------------------------------------
 def get_sanitized_url(env_key: str, driver: str) -> str:
-    url                 =       os.getenv(env_key)
-    
+    url = os.getenv(env_key)  
     if not url:
         return ""
     # Render and others provide postgres://, but SQLAlchemy needs postgresql+driver://
     if url.startswith("postgres://"):
-        url             =       url.replace("postgres://", f"postgresql+{driver}://", 1)
-    
+        url = url.replace("postgres://", f"postgresql+{driver}://", 1)
     elif url.startswith("postgresql://") and f"+{driver}" not in url:
-        url             =       url.replace("postgresql://", f"postgresql+{driver}://", 1)
-    
+        url = url.replace("postgresql://", f"postgresql+{driver}://", 1)    
     return url
-
-DATABASE_URL            =       get_sanitized_url("DATABASE_URL", "asyncpg")
+DATABASE_URL = get_sanitized_url("DATABASE_URL", "asyncpg")
 
 if not DATABASE_URL:
     logger.error("FATAL: DATABASE_URL not found.")
@@ -72,3 +68,6 @@ init_database(DATABASE_URL)
 users_manager = UserManager()
 movies_manager = MovieManager()
 social_manager = SocialManager()
+ai_manager = AIManager()
+notification_manager = NotificationManager()
+token_manager = TokenManager()

@@ -40,6 +40,7 @@ Thumbs.db
 # --- Build artifacts & data ---
 database/
 frontend/
+mobile/
 
 # --- Audit & Docs (exclude from prod image) ---
 AUDIT_REPORT.md

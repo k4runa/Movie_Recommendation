@@ -21,6 +21,7 @@ import os
 import bcrypt
 import logging
 import jwt
+import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import HTTPException, status, Depends, Request
@@ -40,7 +41,7 @@ from google.auth.transport import requests as google_requests
 # ---------------------------------------------------------------------------
 SECRET_KEY                      =   os.getenv("JWT_SECRET_KEY")
 ALGORITHM                       =   "HS256" # Hardcoded for security
-ACCESS_TOKEN_EXPIRE_MINUTES     =   int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "120"))
+ACCESS_TOKEN_EXPIRE_MINUTES     =   int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 GOOGLE_CLIENT_ID                =   os.getenv("GOOGLE_CLIENT_ID")
 
 # FastAPI's OAuth2 scheme — extracts the Bearer token from the
@@ -95,14 +96,64 @@ async def verify_google_token(token: str) -> dict | None:
 # Token Blacklisting
 # ---------------------------------------------------------------------------
 async def is_token_blacklisted(token: str) -> bool:
-    """Check if the token has been revoked."""
-    val             =   await cache_service.get(f"bl_{token}")
-    return val is not None
+    """
+    Check if a token has been revoked.
+
+    Uses a two-tier strategy:
+        1. Fast path — in-memory cache (covers current process lifetime).
+        2. Slow path — persistent DB lookup via TokenManager (survives restarts).
+    On a DB hit, the result is warmed into cache for future fast lookups.
+    """
+    # Fast path: in-memory cache
+    val = await cache_service.get(f"bl_{token}")
+    if val is not None:
+        return True
+
+    # Slow path: decode token to extract jti, check DB
+    try:
+        if not SECRET_KEY:
+            logger.error(f"SECRET_KEY not found, set in .env.")
+            raise
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        jti = payload.get("jti")
+        if jti:
+            from services.deps import token_manager
+            is_revoked = await token_manager.is_revoked(jti)
+            if is_revoked:
+                # Warm cache so subsequent checks are instant
+                exp = payload.get("exp", 0)
+                now = datetime.now(timezone.utc).timestamp()
+                ttl = max(int(exp - now), 60)
+                await cache_service.set(f"bl_{token}", "revoked", ttl=ttl)
+            return is_revoked
+    except Exception:
+        pass
+
+    return False
 
 async def blacklist_token(token: str, expires_in_seconds: int):
-    """Add a token to the blacklist until it naturally expires."""
-    logger.info(f"Revoking token (Fix 2.2): expires in {expires_in_seconds}s")
-    await cache_service.set(f"bl_{token}", "revoked", ttl = expires_in_seconds)
+    """
+    Revoke a token in both the in-memory cache (fast) and the persistent
+    database (survives restarts).  Old tokens without a 'jti' claim will
+    only be cached in memory — graceful degradation.
+    """
+    logger.info(f"Revoking token: expires in {expires_in_seconds}s")
+    # Always write to in-memory cache for fast lookups during this process
+    await cache_service.set(f"bl_{token}", "revoked", ttl=expires_in_seconds)
+
+    # Persist to DB if the token has a jti claim
+    try:
+        if not SECRET_KEY:
+            logger.error(f"SECRET_KEY not found, set in .env.")
+            raise
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        jti = payload.get("jti")
+        if jti:
+            expires_at = datetime.fromtimestamp(payload.get("exp", 0), tz=timezone.utc).isoformat()
+            from services.deps import token_manager
+            await token_manager.revoke(jti, expires_at)
+    except Exception as e:
+        logger.warning(f"Could not persist token revocation to DB: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -150,8 +201,9 @@ def create_access_token(data: dict):
 
     to_encode           =   data.copy()
     expire              =   datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode.update({"exp": expire})
+    jti                 =   secrets.token_urlsafe(16)
+
+    to_encode.update({"exp": expire, "jti": jti})
     encoded_jwt         =   jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 

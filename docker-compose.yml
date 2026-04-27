@@ -1,59 +1,55 @@
-# CineWave — Docker Compose
+# ecofil — Docker Compose
 # Two-service stack: FastAPI application + PostgreSQL database.
 #
 # Usage:
 #   docker-compose up -d --build           # Build and start in background
-#   docker-compose logs -f cinewave_api    # Stream logs
+#   docker-compose logs -f ecofil_api    # Stream logs
 #   docker-compose down                    # Stop and remove containers
 #
 # The .env file is loaded automatically for secrets (JWT key, TMDB API key).
 # PostgreSQL data is persisted via a named Docker volume.
 
-
 services:
-  cinewave_db:
+  ecofil_db:
     image: postgres:16-alpine
-    container_name: cinewave_db
+    container_name: ecofil_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-cinewave}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cinewave_secret}
-      POSTGRES_DB: ${POSTGRES_DB:-cinewave_db}
+      POSTGRES_USER: ${POSTGRES_USER:-ecofil}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecofil_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-ecofil_db}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cinewave} -d ${POSTGRES_DB:-cinewave_db}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ecofil} -d ${POSTGRES_DB:-ecofil_db}" ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
-      
-  cinewave_api:
+
+  ecofil_api:
     build: .
-    container_name: cinewave_api
+    container_name: ecofil_api
     restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cinewave}:${POSTGRES_PASSWORD:-cinewave_secret}@cinewave_db:5432/${POSTGRES_DB:-cinewave_db}
-      - DATABASE_URL_SYNC=postgresql+psycopg2://${POSTGRES_USER:-cinewave}:${POSTGRES_PASSWORD:-cinewave_secret}@cinewave_db:5432/${POSTGRES_DB:-cinewave_db}
     env_file:
-      - .env                            # Secrets: JWT_SECRET_KEY, API_KEY, etc.
+      - .env # Secrets: JWT_SECRET_KEY, API_KEY, etc.
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: "0.5"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
     depends_on:
-      cinewave_db:
+      ecofil_db:
         condition: service_healthy
 
 volumes:

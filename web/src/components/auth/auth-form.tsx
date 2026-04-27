@@ -27,7 +27,7 @@ export function AuthForm() {
             setIsLoading(true);
             try {
                 await googleLogin(tokenResponse.access_token);
-                toast.success("Welcome back to CineWave");
+                toast.success("Welcome back to ecofil");
             } catch (err: any) {
                 setError(err.response?.data?.detail || "Google Login failed");
             } finally {
@@ -50,7 +50,7 @@ export function AuthForm() {
             } else {
                 localStorage.removeItem("remembered_username");
             }
-            toast.success("Welcome back to CineWave");
+            toast.success("Welcome back to ecofil");
         } catch (err: any) {
             const errorData = err.response?.data?.detail;
             let errorMessage = "Invalid credentials. Please try again.";

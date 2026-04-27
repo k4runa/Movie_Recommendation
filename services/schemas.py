@@ -11,7 +11,7 @@ the API.  FastAPI uses these for:
     • Auto-generated OpenAPI / Swagger documentation.
 """
 
-from pydantic import BaseModel, EmailStr, field_validator, Field
+from pydantic import BaseModel, EmailStr, field_validator, model_validator, Field
 from typing import List
 
 
@@ -64,12 +64,28 @@ class UserScheme(BaseModel):
 
 class GoogleLoginRequest(BaseModel):
     """Schema for Google Login requests."""
-    credential: str
+    credential: str = Field(..., max_length=4096)
 
 
 class MovieScheme(BaseModel):
-    query:      str | None  = Field(None, max_length=200)
-    tmdb_id:    int         = Field(0, ge=0, le=999999999)
+    query:        str   | None  = Field(None, max_length=200)
+    canonical_id: str   | None  = Field(None, max_length=100)
+    tmdb_id:      int   | None  = Field(None) # Legacy support
+    title:        str   | None  = Field(None, max_length=500)
+    type:         str   | None  = Field("movie", max_length=50)
+    sources:      dict  | None  = Field(None)
+    overview:     str   | None  = Field(None, max_length=2000)
+    poster_url:   str   | None  = Field(None, max_length=1000)
+    vote_average: float | None  = Field(None)
+    release_date: str   | None  = Field(None, max_length=50)
+    genre_ids:    str   | None  = Field(None, max_length=200)
+    ai_reason:    str   | None  = Field(None, max_length=2000)
+    
+    @model_validator(mode="after")
+    def at_least_one_required(self):
+        if not self.tmdb_id and not self.query and not self.canonical_id:
+            raise ValueError("Either canonical_id, tmdb_id, or query must be provided.")
+        return self
 
 
 class MessageCreate(BaseModel):
@@ -85,13 +101,15 @@ class PrivacyUpdate(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
-    nickname:   str | None = Field(None, max_length=50)
-    bio:        str | None = Field(None, max_length=500)
-    gender:     str | None = Field(None, max_length=30)
-    age:        int | None = Field(None, ge=13, le=120)
-    location:   str | None = Field(None, max_length=100)
-    social_link: str | None = Field(None, max_length=200)
-
+    full_name:      str | None = Field(None, max_length=100)
+    nickname:       str | None = Field(None, max_length=50)
+    bio:            str | None = Field(None, max_length=500)
+    gender:         str | None = Field(None, max_length=30)
+    age:            int | None = Field(None, ge=13, le=120)
+    location:       str | None = Field(None, max_length=100)
+    social_links:   dict| None           = None
+    favorite_genres:list[int] | None   = None
+    social_link:    str | None = Field(None, max_length=200)
 
 # ---------------------------------------------------------------------------
 # Response Models
@@ -108,6 +126,7 @@ class UserResponse(BaseModel):
     id:         int
     username:   str
     nickname:   str | None = None
+    full_name:  str | None = None
     email:      str
     avatar_url: str | None = None
     bio:        str | None = None
@@ -115,6 +134,8 @@ class UserResponse(BaseModel):
     age:        int | None = None
     location:   str | None = None
     social_link: str | None = None
+    social_links: dict | None = None
+    favorite_genres: List[int] | None = None
     show_age:   bool = True
     show_gender: bool = True
     show_location: bool = True
@@ -127,8 +148,8 @@ class UserResponse(BaseModel):
     ai_enabled: bool
     max_toasts: int
     dm_notifications: bool
-    muted_users: str | None = None
     is_private: bool
+    favorites: List[dict] | None = None
 
 
 class UserMinimalResponse(BaseModel):
@@ -153,6 +174,7 @@ class MovieResponse(BaseModel):
     vote_average:   str | None = None
     poster_url:     str | None = None
     release_date:   str | None = None
+    ai_reason:      str | None = None
 
 
 class WatchedMovieResponse(BaseModel):

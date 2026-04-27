@@ -17,7 +17,7 @@ import asyncio
 router = APIRouter(prefix="/social", tags=["social"])
 
 @router.get("/similar", response_model=dict)
-@limiter.limit("5/minute")
+@limiter.limit("120/minute")
 async def get_similar_minds(request: Request, current_user: dict = Depends(get_current_user)):
     """
     Retrieve a list of users with similar movie tastes.
@@ -86,14 +86,14 @@ async def delete_message(request: Request,message_id: int,current_user: dict = D
 
 @router.get("/conversations", response_model=dict)
 @limiter.limit("100/minute")
-async def get_conversations(request: Request,status: str = "ACCEPTED",current_user: dict = Depends(get_current_user)):
+async def get_conversations(request: Request,status: str = "ACCEPTED", skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):
     """
     Fetch all conversations for the current user.
     status: 'ACCEPTED' for normal inbox, 'PENDING' for message requests.
     """
     user_id = current_user["id"]
         
-    conversations = await social_manager.get_conversations(user_id, status=status)  #type: ignore
+    conversations = await social_manager.get_conversations(user_id, status=status, skip=skip, limit=limit)  #type: ignore
     return {"success": True, "data": {"conversations": conversations}}
 
 
@@ -118,13 +118,13 @@ async def handle_message_request(request: Request,other_user_id: int,action: str
 
 @router.get("/messages/{other_user_id}", response_model=dict)
 @limiter.limit("100/minute")
-async def get_message_history(request: Request,other_user_id: int,current_user: dict = Depends(get_current_user)):
+async def get_message_history(request: Request,other_user_id: int, skip: int = 0, limit: int = 50, current_user: dict = Depends(get_current_user)):
     """
     Fetch full message history with another user.
     """
     user_id = current_user["id"]
         
-    messages = await social_manager.get_messages(user_id, other_user_id)    #type: ignore
+    messages = await social_manager.get_messages(user_id, other_user_id, skip=skip, limit=limit)    #type: ignore
     return {"success": True, "data": {"messages": messages}}
 
 
@@ -153,7 +153,7 @@ async def delete_conversation(request: Request,other_user_id: int,current_user: 
 
 
 @router.patch("/privacy", response_model=dict)
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 async def update_privacy_settings(request: Request,privacy: PrivacyUpdate,current_user: dict = Depends(get_current_user)):
     """
     Enable or disable public profile discovery in 'Similar Minds'.

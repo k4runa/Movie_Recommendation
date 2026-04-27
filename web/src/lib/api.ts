@@ -78,7 +78,7 @@ export const aiApi = {
         'Content-Type': 'application/json',
       },
       credentials: 'include', // Fix 8.1: Send cookies with fetch
-      body: JSON.stringify({ message, history: history || [] }),
+      body: JSON.stringify({ message, history: history || [], stream: true }),
     });
   },
 };

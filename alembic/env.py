@@ -31,7 +31,7 @@ target_metadata = Base.metadata
 # Uses the SYNC driver (psycopg2) because Alembic runs migrations synchronously.
 database_url_sync = os.getenv("DATABASE_URL_SYNC")
 if database_url_sync:
-    config.set_main_option("sqlalchemy.url", database_url_sync)
+    config.set_main_option("sqlalchemy.url", database_url_sync.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

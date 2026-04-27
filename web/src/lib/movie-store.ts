@@ -35,7 +35,7 @@ export const useMovieStore = create<MovieState>((set, get) => ({
         isRecsLoading: false 
       });
     } catch (err) {
-      console.error("Failed to fetch recommendations in store", err);
+      console.log("Failed to fetch recommendations in store (Background):", err);
       set({ isRecsLoading: false });
     }
   },

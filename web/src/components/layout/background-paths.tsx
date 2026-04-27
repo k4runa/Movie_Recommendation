@@ -49,7 +49,7 @@ function FloatingPaths({ position }: { position: number }) {
   );
 }
 
-export function BackgroundPaths({ title = "CineWave" }: { title?: string }) {
+export function BackgroundPaths({ title = "ecofil" }: { title?: string }) {
   return (
     <div className="fixed inset-0 w-full h-full overflow-hidden bg-white dark:bg-neutral-950 -z-10 hidden md:block">
       <div className="absolute inset-0">

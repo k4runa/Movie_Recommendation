@@ -6,6 +6,7 @@ web/build/
 web/.env.local
 web/.env.*.local
 frontend/
+mobile/
 
 # --- Python ---
 __pycache__/
@@ -64,3 +65,4 @@ htmlcov/
 # --- Audit (contains sensitive findings) ---
 AUDIT_REPORT.md
 uploads/
+

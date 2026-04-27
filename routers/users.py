@@ -59,7 +59,7 @@ async def _revoke_token(token: str):
 
 
 from typing import Any
-from pydantic import Field as PydanticField
+from pydantic import Field as PydanticField, field_validator
 
 class UpdateUserRequest(BaseModel):
     """Payload for partial user updates — specify field name and new value."""
@@ -67,6 +67,19 @@ class UpdateUserRequest(BaseModel):
     field: str = PydanticField(..., max_length=50)
     value: Any
     current_password: str | None = PydanticField(None, max_length=128)
+
+    @field_validator("field")
+    @classmethod
+    def validate_field(cls, v: str) -> str:
+        allowed = {
+            "password", "email", "ai_enabled", "username", "nickname", "max_toasts", "avatar_url", 
+            "bio", "gender", "age", "location", "social_link",
+            "show_age", "show_gender", "show_location", "show_bio", "show_favorites", "is_private",
+            "eco_recommendations_enabled", "dm_notifications"
+        }
+        if v.lower() not in allowed:
+            raise ValueError(f"Field '{v}' cannot be updated.")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +116,7 @@ async def register(response: Response, request: Request, user: UserScheme):
                 raise HTTPException(status_code=400, detail="This username is already taken.")
             if "email" in err_str:
                 raise HTTPException(status_code=400, detail="This email is already registered.")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
     
     # Fix 8.1: Set cookie on registration
     access_token = create_access_token(data={"sub": user.username})
@@ -112,7 +125,7 @@ async def register(response: Response, request: Request, user: UserScheme):
         value=access_token,
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="strict",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     
@@ -127,8 +140,7 @@ async def get_all_users(skip: int = 0, limit: int = 10, current_user: dict = Dep
     Returns a paginated array of user records including device metadata.
     Non-admin users receive a 403 Forbidden response.
     """
-    user_in_db = await users_manager.get_user_by_username(current_user["username"])  # type: ignore
-    if user_in_db.get("role") != "admin":
+    if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
     logger.info(f"Fetching users with skip={skip}, limit={limit}...")
@@ -141,11 +153,12 @@ async def get_user_by_id(id: int, current_user: dict = Depends(get_current_user)
     """
     Retrieve a user record by its numeric primary key (admin-only).
     """
-    user_in_db = await users_manager.get_user_by_username(current_user["username"])  # type: ignore
-    if user_in_db.get("role") != "admin":
+    if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
     user = await users_manager.get_user_by_id(id)  # type: ignore
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     return {"success": True, "data": {"user": user}}
 
 
@@ -243,6 +256,22 @@ async def upload_avatar(request: Request,file: UploadFile = File(...),current_us
         if len(content) > MAX_AVATAR_BYTES:
             os.unlink(tmp.name)
             raise HTTPException(status_code=400, detail="File too large (max 5MB)")
+            
+        # Magic bytes validation to prevent malicious file uploads
+        is_valid_image = False
+        if content.startswith(b'\xff\xd8\xff'): # JPEG
+            is_valid_image = True
+        elif content.startswith(b'\x89PNG\r\n\x1a\n'): # PNG
+            is_valid_image = True
+        elif content.startswith(b'GIF87a') or content.startswith(b'GIF89a'): # GIF
+            is_valid_image = True
+        elif content.startswith(b'RIFF') and len(content) >= 12 and content[8:12] == b'WEBP': # WEBP
+            is_valid_image = True
+            
+        if not is_valid_image:
+            os.unlink(tmp.name)
+            raise HTTPException(status_code=400, detail="Invalid image file signature. File is corrupted or malicious.")
+            
         tmp.write(content)
         tmp_path = tmp.name
 

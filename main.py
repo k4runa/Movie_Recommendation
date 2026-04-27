@@ -33,7 +33,7 @@ from services.database import (
 )
 from services import database as db_mod
 from services.deps import users_manager
-from routers import auth, users, movies, ai, social
+from routers import auth, users, movies, ai, social, notifications
 from sqlalchemy.exc import IntegrityError
 from services.cache import cache_service
 import asyncio
@@ -54,15 +54,7 @@ async def lifespan(app: FastAPI):
     if db_mod._engine:
         async with db_mod._engine.begin() as conn:
             await conn.run_sync(db_mod.Base.metadata.create_all)
-            # FORCE FIX: Check if social_link exists, if not add it
-            try:
-                check_sql = text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='social_link';")
-                result = await conn.execute(check_sql)
-                if not result.scalar():
-                    logger.info("Auto-Migration: Adding missing 'social_link' column...")
-                    await conn.execute(text("ALTER TABLE users ADD COLUMN social_link VARCHAR(255);"))
-            except Exception as e:
-                logger.warning(f"Auto-Migration skipped or failed: {e}")
+            # FORCE FIX: Check if social_link exists, if not add it (moved to alembic)
             
     await users_manager.ensure_admin_exists()  # type: ignore
     # Start background cache cleaner
@@ -105,7 +97,7 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 from services.deps import limiter
 
 app = FastAPI(
-    title="CineWave API",
+    title="ecofil API",
     description="A production-ready, AI-powered movie recommendation system with advanced security hardening.",
     version="1.0.0",
     lifespan=lifespan,
@@ -148,6 +140,7 @@ app.include_router(users.router)
 app.include_router(movies.router)
 app.include_router(ai.router)
 app.include_router(social.router)
+app.include_router(notifications.router)
 
 
 @app.get("/health", tags=["system"])

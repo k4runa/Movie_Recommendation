@@ -79,7 +79,6 @@ def resilient_call(
                     logger.warning(f"{func.__name__} attempt {attempt + 1} failed: {e}. Retrying in {sleep_time:.2f}s...")
                     await asyncio.sleep(sleep_time)
             
-            # Should not reach here
             return None
         return wrapper
     return decorator

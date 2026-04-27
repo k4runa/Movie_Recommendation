@@ -140,7 +140,7 @@ export function VercelV0Chat({ placeholder = "Ask Eco anything..." }: { placehol
       setMessages((prev) => [...prev, { role: "assistant", content: fullContent }]);
       setStreamingContent(null);
     } catch (err) {
-      console.error("Chat error:", err);
+      console.log("Chat error (User Action):", err);
       setMessages((prev) => [
         ...prev,
         {

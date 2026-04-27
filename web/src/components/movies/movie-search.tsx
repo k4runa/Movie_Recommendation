@@ -42,7 +42,7 @@ export function MovieSearch() {
           [];
         setTrackedIds(new Set(movies.map((m: any) => m.tmdb_id)));
       } catch (err) {
-        console.error("Failed to fetch tracked movies for search", err);
+        console.log("Failed to fetch tracked movies for search (Background):", err);
       }
     };
     fetchTracked();

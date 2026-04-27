@@ -34,7 +34,7 @@ export function MovieDashboard() {
           [],
       );
     } catch (err) {
-      console.error("Failed to load movies", err);
+      console.log("Failed to load movies (Background):", err);
     } finally {
       setIsLoading(false);
     }

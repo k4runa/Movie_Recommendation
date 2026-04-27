@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CineWave — AI Movie Recommendations",
+  title: "ecofil — AI Movie Recommendations",
   description:
     "AI-powered movie recommendations based on your watching habits.",
 };

@@ -1,26 +1,180 @@
 import random
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from services.deps import movies_manager, users_manager, limiter
 from services.tmdb import (
-    search_tmdb_movies,
     fetch_recommendations,
     fetch_similar_movies,
 )
 from services.auth import get_current_user
 from services.schemas import MovieScheme
 from services.ai import ai_service
+from services.discovery.manager import DiscoveryManager
+from services.tmdb import fetch_tmdb_movie_by_id
+import asyncio
+from services.database import logger
+from services.cache import cache_service
 
-router              =   APIRouter(prefix="/movies", tags=["Movies"])
+discovery_manager = DiscoveryManager()
+router = APIRouter(prefix="/movies", tags=["Movies"])
+
+
+@router.get("/all/trending")
+@router.get("/all/trending/")
+@limiter.limit("20/minute")
+async def get_trending_movies(request: Request, limit: int = 20, current_user: dict = Depends(get_current_user)):
+    """
+    Fetch trending movies from TMDB for the dashboard.
+    """
+    username = current_user["username"]
+    # Get all TMDB IDs the user has already tracked/added
+    tracked_ids = await movies_manager.get_all_tracked_tmdb_ids(username) # type: ignore
+    
+    # Fetch slightly more to account for filtered items
+    fetch_limit = limit + len(tracked_ids)
+    results = await fetch_recommendations(genre_ids=[], limit=fetch_limit, sort_by="popularity.desc")
+    
+    # Filter out movies that are already tracked (including favorites)
+    filtered_results = [m for m in results if m.get("tmdb_id") not in tracked_ids]
+    
+    return {"success": True, "data": {"results": filtered_results[:limit]}}
+
+
+@router.get("/discovery/{entity_id}")
+async def get_discovery_details(entity_id: str, skip_ai: bool = False, current_user: dict = Depends(get_current_user)):
+    """Fetch details for a discovery entity by its canonical ID."""
+    dm = DiscoveryManager()
+    entity = await dm.get_entity_by_id(entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found or cache expired.")
+    
+    # Add AI Perspective
+    movie_dict = entity.model_dump()
+    username = current_user["username"]
+
+    # Check cache first to avoid re-generating for the same user/entity
+    cache_key = f"ai_reason_{username}_{entity_id}"
+    cached_ai = await cache_service.get(cache_key)
+    if cached_ai:
+        movie_dict["ai_reason"] = cached_ai
+        return {"success": True, "data": movie_dict}
+
+    watched = await movies_manager.get_watched_movies(username, limit=5) # type: ignore
+    
+    ai_reason = "A highly regarded film worth checking out."
+    if ai_service.active and watched and not skip_ai:
+        try:
+            watched_titles = [m.get("title") for m in watched]
+            reasons = await asyncio.wait_for(
+                ai_service.explain_recommendations(watched_titles, [movie_dict]),
+                timeout=12.0
+            )
+            ai_reason = reasons.get(movie_dict["title"], ai_reason)
+            # Cache the successful AI generation for 1 hour
+            await cache_service.set(cache_key, ai_reason, ttl=3600)
+        except asyncio.TimeoutError:
+            ai_reason = "Eco's overview is taking a bit longer than usual. The movie should be great though!"
+        except Exception as e:
+            logger.error(f"Discovery AI generation failed: {e}")
+            
+    movie_dict["ai_reason"] = ai_reason
+    return {"success": True, "data": movie_dict}
+
+
+@router.get("/details/{tmdb_id}")
+async def get_movie_details(tmdb_id: int, skip_ai: bool = False, passed_ai_reason: str = None, current_user: dict = Depends(get_current_user)):
+    """
+    Fetch full movie details along with an AI-generated explanation of why the user might like it.
+    """
+
+    movie = await fetch_tmdb_movie_by_id(tmdb_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+        
+    username = current_user["username"]
+    
+    # Check cache first
+    cache_key = f"ai_reason_{username}_tmdb_{tmdb_id}"
+    from services.cache import cache_service
+    cached_ai = await cache_service.get(cache_key)
+    if cached_ai:
+        movie["ai_reason"] = cached_ai
+        return {"success": True, "data": movie}
+
+    watched = await movies_manager.get_watched_movies(username, limit=5) # type: ignore
+    
+    ai_reason = "A highly regarded film worth checking out."
+    if ai_service.active and watched and not skip_ai:
+        try:
+            watched_titles = [m.get("title") for m in watched]
+            reasons = await asyncio.wait_for(
+                ai_service.explain_recommendations(watched_titles, [movie]),
+                timeout=12.0
+            )
+            ai_reason = reasons.get(movie["title"], ai_reason)
+            # Cache for 1 hour
+            await cache_service.set(cache_key, ai_reason, ttl=3600)
+        except asyncio.TimeoutError:
+            # Graceful degradation
+            ai_reason = "AI analysis is currently taking too long. Enjoy the movie!"
+        except Exception as e:
+            logger.error(f"AI detail generation failed: {e}")
+        
+    movie["ai_reason"] = ai_reason
+    return {"success": True, "data": movie}
+
 
 
 @router.get("/search")
 @limiter.limit("20/minute")
-async def search_movies(request: Request, query: str, limit: int = 10):
+async def search_movies(
+    request: Request,
+    query: str = Query(..., min_length=1, max_length=200),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: dict = Depends(get_current_user),
+):
     """
-    Search for movies on TMDB and return a list of results.
+    Search for movies across multiple providers (TMDB, AniList, etc.).
+    Authentication required — prevents anonymous abuse of the proxy.
     """
-    results         =   await search_tmdb_movies(query, limit=limit)
+    results = await discovery_manager.search_all(query, limit=limit)
     return {"success": True, "data": {"results": results}}
+
+
+@router.get("/filter-by-release-date")
+@router.get("/filter-by-release-date/")
+@limiter.limit("20/minute")
+async def get_movies_filter_by_release_date(request: Request, current_user: dict = Depends(get_current_user)):
+    """
+    Return a paginated list of movies tracked by the authenticated user.
+    """
+    username = current_user["username"]
+    movies = await movies_manager.filter_by_release_date(username)  # type: ignore
+    return {"success": True, "data": {"movies": movies}}
+
+
+@router.get("/filter-by-added-date")
+@router.get("/filter-by-added-date/")
+@limiter.limit("20/minute")
+async def get_movies_filter_by_added_date(request: Request, current_user: dict = Depends(get_current_user)):
+    """
+    Return a paginated list of movies tracked by the authenticated user.
+    """
+    username = current_user["username"]
+    movies = await movies_manager.filter_by_added_date(username)  # type: ignore
+    return {"success": True, "data": {"movies": movies}}
+
+
+
+@router.get("/filter-by-rating/{rating}")
+@router.get("/filter-by-rating/{rating}/")
+@limiter.limit("20/minute")
+async def get_movies_filter_by_rating(request: Request, rating: int, current_user: dict = Depends(get_current_user)):
+    """
+    Return a paginated list of movies tracked by the authenticated user.
+    """
+    username = current_user["username"]
+    movies = await movies_manager.filter_by_rating(username, rating)  # type: ignore
+    return {"success": True, "data": {"movies": movies}}
 
 
 @router.get("/")
@@ -49,7 +203,7 @@ async def add_movie(movie: MovieScheme, current_user: dict = Depends(get_current
     Add a movie to the user's collection.
     """
     username = current_user["username"]
-    await movies_manager.add_movie(username=username, query=movie.query, tmdb_id=movie.tmdb_id)  # type: ignore
+    await movies_manager.add_movie(username=username, movie_data=movie)  # type: ignore
     return {"success": True, "message": "Movie successfully added."}
 
 
@@ -64,6 +218,15 @@ async def toggle_favorite(movie_id: int, current_user: dict = Depends(get_curren
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/favorites")
+async def get_favorites(current_user: dict = Depends(get_current_user)):
+    """
+    Fetch the authenticated user's favorite movies.
+    """
+    username = current_user["username"]
+    favorites = await movies_manager.get_favorites(username) # type: ignore
+    return {"success": True, "data": {"favorites": favorites}}
 
 @router.get("/recommendations")
 async def get_recommendations(current_user: dict = Depends(get_current_user)):
@@ -118,14 +281,26 @@ async def get_recommendations(current_user: dict = Depends(get_current_user)):
     final_recs              =   unique_candidates[:12]
     # 7. Add AI Reasons
     user_db                 =   await users_manager.get_user_by_username(username)  #type: ignore
-    if ai_service.active and watched and user_db.get("ai_enabled"):
-        watched_titles      =   [m.get("title") for m in watched[-10:]]
-        explanations        =   await ai_service.explain_recommendations(watched_titles, final_recs)
-        for r in final_recs:
-            reason = explanations.get(r.get("title","N/A"))
-            if not reason or reason.upper() == "N/A":
-                r["ai_reason"] = ("A handpicked selection matching your unique cinematic preferences.")
-            else:
-                r["ai_reason"] = reason
+    if ai_service.active and user_db.get("ai_enabled"):
+        try:
+            watched_titles = [m.get("title") for m in watched[-10:]]
+            # Timeout after 12 seconds for bulk recommendations
+            raw_explanations = await asyncio.wait_for(
+                ai_service.explain_recommendations(watched_titles, final_recs),
+                timeout=12.0
+            )
+
+            explanations = ai_service._parse_explanations(raw_explanations) if isinstance(raw_explanations, str) else raw_explanations
+            
+            for r in final_recs:
+                reason = explanations.get(r.get("title","N/A"))
+                if not reason or reason.upper() == "N/A":
+                    r["ai_reason"] = "A handpicked selection matching your unique cinematic preferences."
+                else:
+                    r["ai_reason"] = reason
+        except Exception as e:
+            logger.error(f"Bulk AI recommendation failed: {e}")
+            for r in final_recs:
+                r["ai_reason"] = "I've picked this one because it's a timeless gem that matches your vibe! <3"
 
     return {"success": True, "data": {"recommendations": final_recs}}

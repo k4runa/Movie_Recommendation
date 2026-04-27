@@ -74,8 +74,8 @@ export function Header({
 					>
 						<Menu className="w-5 h-5" />
 					</button>
-					<h1 className="text-lg font-black tracking-tighter text-primary md:hidden">CINEWAVE</h1>
-					<h1 className="text-xl font-black tracking-tighter text-primary hidden md:block">CINEWAVE</h1>
+					<h1 className="text-lg font-black tracking-tighter text-primary md:hidden">ecofil</h1>
+					<h1 className="text-xl font-black tracking-tighter text-primary hidden md:block">ecofil</h1>
 				</div>
 
 				<div className="hidden md:flex flex-1 justify-center max-w-md mx-4">

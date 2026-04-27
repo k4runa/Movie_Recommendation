@@ -19,7 +19,7 @@ async def upload_image(file_path: str, public_id: str) -> str:
     response = cloudinary.uploader.upload(
         file_path,
         public_id = public_id,
-        folder = "cinewave_avatars",
+        folder = "ecofil_avatars",
         overwrite = True,
         transformation = [
             {"width": 400, "height": 400, "crop": "fill", "gravity": "face"},

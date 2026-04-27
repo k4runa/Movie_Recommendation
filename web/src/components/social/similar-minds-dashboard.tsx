@@ -51,7 +51,7 @@ export const SimilarMindsDashboard = ({ onTabChange }: { onTabChange?: (tab: "mo
       const res = await socialApi.getSimilarMinds();
       setMatches(res.data?.data?.matches || []);
     } catch (err) {
-      console.error(err);
+      console.log("Failed to load similar minds (Background):", err);
       toast.error("Failed to load similar minds.");
     } finally {
       setLoading(false);
@@ -341,7 +341,7 @@ const generateImpression = (profile: any) => {
     "A perfect match for shared discussions.",
     "A true kindred spirit for your journey.",
     "Definitely someone to keep an eye on in the discovery feed.",
-    "Their taste mirrors the sophisticated side of CineWave."
+    "Their taste mirrors the sophisticated side of ecofil."
   ];
 
   const intro = intros[Math.floor((username.length + favCount) + (bio?.length || 0) % intros.length)];

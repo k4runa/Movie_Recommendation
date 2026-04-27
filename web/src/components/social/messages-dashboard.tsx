@@ -89,7 +89,7 @@ export const MessagesDashboard = () => {
         }
       }
     } catch (err) {
-      console.error("Failed to fetch conversations", err);
+      console.log("Failed to fetch conversations (Background):", err);
     } finally {
       // Only disable first-load spinner
       if (loading) setLoading(false);
@@ -114,7 +114,7 @@ export const MessagesDashboard = () => {
       await socialApi.markAsRead(otherId);
       fetchConversations(); // Refresh unread badges
     } catch (err) {
-      console.error("Failed to fetch messages", err);
+      console.log("Failed to fetch messages (Background):", err);
     }
   };
 

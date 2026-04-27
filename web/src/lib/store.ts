@@ -159,7 +159,7 @@ export const useDashboardStore = create<DashboardState>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
     }),
     {
-      name: 'cinewave-dashboard-storage',
+      name: 'ecofil-dashboard-storage',
     }
   )
 );

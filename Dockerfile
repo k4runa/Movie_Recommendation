@@ -1,4 +1,4 @@
-# CineWave API — Multi-Stage Dockerfile
+# ecofil API — Multi-Stage Dockerfile
 # Builds the Next.js frontend and the FastAPI backend into a single lean image.
 
 # --- Stage 1: Build Frontend ---

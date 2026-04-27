@@ -1,17 +1,17 @@
 services:
-  # 1. CineWave Unified App (FastAPI + Next.js)
+  # 1. ecofil Unified App (FastAPI + Next.js)
   - type: web
-    name: cinewave-api
+    name: ecofil-api
     env: docker
     dockerfilePath: ./Dockerfile
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: cinewave-db
+          name: ecofil-db
           property: connectionString
       - key: DATABASE_URL_SYNC
         fromDatabase:
-          name: cinewave-db
+          name: ecofil-db
           property: connectionString
       - key: JWT_ALGORITHM
         value: HS256
@@ -29,9 +29,9 @@ services:
       # - GEMINI_API_KEY
       # - GROQ_API_KEY
 
-  # 2. CineWave PostgreSQL Database
+  # 2. ecofil PostgreSQL Database
 databases:
-  - name: cinewave-db
-    databaseName: cinewave_db
-    user: cinewave
+  - name: ecofil-db
+    databaseName: ecofil_db
+    user: ecofil
     plan: free

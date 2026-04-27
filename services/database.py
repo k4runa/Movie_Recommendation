@@ -20,6 +20,7 @@ from sqlalchemy import (
     String,
     Integer,
     Boolean,
+    JSON,
     select,
     delete,
     update,
@@ -27,6 +28,7 @@ from sqlalchemy import (
     and_,
     func,
     UniqueConstraint,
+    Index,
 )
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
@@ -37,16 +39,21 @@ import os
 import logging
 import bcrypt
 import secrets
+import uuid
 from datetime import datetime, timezone
 from collections import Counter
 from dotenv import load_dotenv
-from .schemas import UserScheme
+from .schemas import UserScheme, MovieScheme
 
+# ---------------------------------------------------------------------------
+# Global Constants
+# ---------------------------------------------------------------------------
+
+RESERVED_USERNAMES = {"admin", "root", "system", "superuser", "administrator"}
 load_dotenv()
 
-# Render.com provides DATABASE_URL as postgres://...
 db_url = os.getenv(
-    "DATABASE_URL", "postgresql+asyncpg://cinewave:[EMAIL_ADDRESS]:5432/cinewave_db"
+    "DATABASE_URL", "postgresql+asyncpg://ecofil:[EMAIL_ADDRESS]:5432/ecofil_db"
 )
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
@@ -54,7 +61,7 @@ elif db_url.startswith("postgresql://") and "asyncpg" not in db_url:
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 os.environ["DATABASE_URL"] = db_url
 
-db_url_sync = os.getenv("DATABASE_URL_SYNC", "sqlite:///./database/cinewave.db")
+db_url_sync = os.getenv("DATABASE_URL_SYNC", "sqlite:///./database/ecofil.db")
 if db_url_sync.startswith("postgres://"):
     db_url_sync = db_url_sync.replace("postgres://", "postgresql+psycopg2://", 1)
 elif db_url_sync.startswith("postgresql://") and "psycopg2" not in db_url_sync:
@@ -75,11 +82,9 @@ logger = logging.getLogger(__name__)
 # SQLAlchemy Base
 # ---------------------------------------------------------------------------
 
-
 class Base(DeclarativeBase):
     """Declarative base class for all ORM models."""
     pass
-
 
 # ---------------------------------------------------------------------------
 # Database Configuration & Shared Engine
@@ -169,11 +174,14 @@ class User(Base):
     id:                             Mapped[int]                     =   mapped_column(primary_key=True)
     username:                       Mapped[str]                     =   mapped_column(String, unique=True, nullable=False)
     nickname:                       Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
+    full_name:                      Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
     role:                           Mapped[str]                     =   mapped_column(String, nullable=False, default="user", server_default="user")
     password:                       Mapped[str]                     =   mapped_column(String, nullable=False)
     email:                          Mapped[str]                     =   mapped_column(String, unique=True, nullable=False)
     avatar_url:                     Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
     bio:                            Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
+    social_links:                   Mapped[Optional[dict]]          =   mapped_column(JSON, nullable=True)
+    favorite_genres:                Mapped[Optional[List[int]]]     =   mapped_column(JSON, nullable=True)
     gender:                         Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
     age:                            Mapped[Optional[int]]           =   mapped_column(Integer, nullable=True)
     location:                       Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
@@ -206,6 +214,7 @@ class User(Base):
     # --- Account lifecycle ---
     is_deleted:                     Mapped[bool]                    =   mapped_column(Boolean, nullable=False, default=False)
     is_private:                     Mapped[bool]                    =   mapped_column(Boolean, nullable=False, default=False)  # If true, won't show in 'Similar Minds'
+    eco_recommendations_enabled:     Mapped[bool]                   =   mapped_column(Boolean, nullable=False, default=True, server_default="true")
     created_at:                     Mapped[str]                     =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
     last_seen:                      Mapped[str]                     =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -214,6 +223,8 @@ class User(Base):
     sent_messages:                  Mapped[List["Message"]]         = relationship("Message", foreign_keys="Message.sender_id", back_populates="sender", cascade="all, delete-orphan")
     received_messages:              Mapped[List["Message"]]         = relationship("Message", foreign_keys="Message.receiver_id", back_populates="receiver", cascade="all, delete-orphan")
     conversations:                  Mapped[List["Conversation"]]    = relationship("Conversation", primaryjoin="or_(User.id==Conversation.user1_id, User.id==Conversation.user2_id)", viewonly=True)
+    ai_messages:                    Mapped[List["AIMessage"]]       = relationship("AIMessage", back_populates="user", cascade="all, delete-orphan")
+    notifications:                  Mapped[List["Notification"]]    = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
 
 class Movies(Base):
@@ -230,19 +241,23 @@ class Movies(Base):
     """
 
     __tablename__                                       =   "movies"
-    __table_args__                                      =   (UniqueConstraint("user_id", "tmdb_id", name="uq_user_tmdb_movie"),)
+    __table_args__                                      =   (UniqueConstraint("user_id", "canonical_id", name="uq_user_canonical_movie"),)
 
     id:                 Mapped[int]                     =   mapped_column(primary_key=True)
     user_id:            Mapped[int]                     =   mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    tmdb_id:            Mapped[int]                     =   mapped_column(Integer, nullable=False, index=True)
+    canonical_id:       Mapped[str]                     =   mapped_column(String, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
+    tmdb_id:            Mapped[Optional[int]]           =   mapped_column(Integer, nullable=True, index=True)
     title:              Mapped[str]                     =   mapped_column(String, nullable=False)
+    type:               Mapped[str]                     =   mapped_column(String, nullable=False, default="movie")
     overview:           Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
-    genre_ids:          Mapped[str]                     =   mapped_column(String, nullable=False)  # Comma-separated TMDB genre IDs
+    genre_ids:          Mapped[str]                     =   mapped_column(String, nullable=True)  # Comma-separated genre info
+    sources:            Mapped[Optional[dict]]          =   mapped_column(JSON, nullable=True)
     vote_average:       Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
     poster_url:         Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
     release_date:       Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
     status:             Mapped[str]                     =   mapped_column(String, nullable=False, default="Not yet")
     is_favorite:        Mapped[bool]                    =   mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    ai_reason:          Mapped[Optional[str]]           =   mapped_column(String, nullable=True)
 
     user:               Mapped["User"]                  =   relationship("User", back_populates="movies")
     watched_movies:     Mapped[List["WatchedMovies"]]   =   relationship("WatchedMovies",back_populates="movie",lazy="selectin",cascade="all, delete-orphan",)
@@ -295,7 +310,10 @@ class Conversation(Base):
     Tracks the status of a conversation between two users (e.g. accepted, pending).
     """
     __tablename__                                   =   "conversations"
-    __table_args__                                  =   (UniqueConstraint("user1_id", "user2_id", name="uq_user_pair"),)
+    __table_args__                                  =   (
+        UniqueConstraint("user1_id", "user2_id", name="uq_user_pair"),
+        Index("ix_conv_user1_user2", "user1_id", "user2_id"),
+    )
 
     id:                 Mapped[int]                 =   mapped_column(primary_key=True)
     user1_id:           Mapped[int]                 =   mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -305,6 +323,20 @@ class Conversation(Base):
     updated_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
     user1:              Mapped["User"]              =   relationship("User", foreign_keys=[user1_id])
     user2:              Mapped["User"]              =   relationship("User", foreign_keys=[user2_id])
+
+
+class AIMessage(Base):
+    """
+    Represents a message in a chat with Eco AI.
+    """
+    __tablename__                                   =   "ai_messages"
+
+    id:                 Mapped[int]                 =   mapped_column(primary_key=True)
+    user_id:            Mapped[int]                 =   mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    role:               Mapped[str]                 =   mapped_column(String, nullable=False) # user, assistant
+    content:            Mapped[str]                 =   mapped_column(String, nullable=False)
+    created_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
+    user:               Mapped["User"]              =   relationship("User", back_populates="ai_messages")
 
 
 class SimilarityMatch(Base):
@@ -320,19 +352,108 @@ class SimilarityMatch(Base):
     target_id:          Mapped[int]                 =   mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     score:              Mapped[float]               =   mapped_column(nullable=False, index=True)
     reasons:            Mapped[Optional[str]]       =   mapped_column(String, nullable=True) # e.g. "Both love Horror"
+
+
+class Notification(Base):
+    """
+    Stores system and social notifications for a user.
+    """
+    __tablename__                                   =   "notifications"
+
+    id:                 Mapped[int]                 =   mapped_column(primary_key=True)
+    user_id:            Mapped[int]                 =   mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title:              Mapped[str]                 =   mapped_column(String, nullable=False)
+    content:            Mapped[str]                 =   mapped_column(String, nullable=False)
+    type:               Mapped[str]                 =   mapped_column(String, default="general", server_default="general") # general, message, match
+    is_read:            Mapped[bool]                =   mapped_column(Boolean, default=False, server_default="false")
+    created_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat(), index=True)
+    
+    user:               Mapped["User"]              =   relationship("User", back_populates="notifications")
     updated_at:         Mapped[str]                 =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
 
 
-# ---------------------------------------------------------------------------
-# Global Constants
-# ---------------------------------------------------------------------------
-RESERVED_USERNAMES = {"admin", "root", "system", "superuser", "administrator"}
 
+class RevokedToken(Base):
+    """
+    Persistent token blacklist.
+
+    Stores JWTs (by their 'jti' claim) that have been explicitly revoked
+    (logout, password change, username change).  This survives server
+    restarts unlike the previous in-memory cache implementation.
+
+    Rows are purged by a background task once 'expires_at' has passed.
+    """
+    __tablename__                                   =   "revoked_tokens"
+
+    id:             Mapped[int]                     =   mapped_column(primary_key=True)
+    jti:            Mapped[str]                     =   mapped_column(String, unique=True, nullable=False, index=True)
+    expires_at:     Mapped[str]                     =   mapped_column(String, nullable=False, index=True)
+    revoked_at:     Mapped[str]                     =   mapped_column(String, nullable=False, default=lambda: datetime.now(timezone.utc).isoformat())
+
+
+# ---------------------------------------------------------------------------
+# TokenManager — Persistent Token Blacklist
+# ---------------------------------------------------------------------------
+
+
+class TokenManager:
+    """
+    Manages persistent JWT revocation via the revoked_tokens table.
+
+    Provides three operations:
+        revoke()        — Add a JTI to the blacklist.
+        is_revoked()    — Check if a JTI is revoked.
+        purge_expired() — Clean up rows whose tokens have naturally expired.
+    """
+
+    def __init__(self):
+        self._session_maker = _session_maker
+
+    @property
+    def session(self):
+        return self._session_maker
+
+    async def revoke(self, jti: str, expires_at: str):
+        """Persist a revoked token's JTI to the database."""
+        if not self.session:
+            return
+        async with self.session() as session:
+            try:
+                token = RevokedToken(jti=jti, expires_at=expires_at)
+                session.add(token)
+                await session.commit()
+                logger.info(f"Token revoked (jti={jti[:8]}...)")
+            except Exception as e:
+                await session.rollback()
+                logger.warning(f"Token revocation DB write failed: {e}")
+
+    async def is_revoked(self, jti: str) -> bool:
+        """Check if a JTI exists in the persistent blacklist."""
+        if not self.session:
+            return False
+        async with self.session() as session:
+            stmt = select(RevokedToken).where(RevokedToken.jti == jti)
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none() is not None
+
+    async def purge_expired(self):
+        """Remove expired tokens from the blacklist to keep the table small."""
+        if not self.session:
+            return
+        async with self.session() as session:
+            try:
+                now = datetime.now(timezone.utc).isoformat()
+                stmt = delete(RevokedToken).where(RevokedToken.expires_at < now)
+                await session.execute(stmt)
+                await session.commit()
+                logger.info(f"Purged expired revoked tokens")
+            except Exception as e:
+                await session.rollback()
+                logger.warning(f"Token purge failed: {e}")
 
 # ---------------------------------------------------------------------------
 # UserManager
 # ---------------------------------------------------------------------------
-
 
 class UserManager:
     """
@@ -457,6 +578,7 @@ class UserManager:
                     country     =   "Pending",
                     city        =   "Pending",
                     ai_enabled  =   True,
+                    eco_recommendations_enabled = True,
                     is_deleted  =   False,
                     created_at  =   created_at,
                     last_seen   =   created_at,
@@ -489,8 +611,7 @@ class UserManager:
         logger.info(f"Deleted user: {user.username}")
         return True
 
-    @transaction
-    async def ensure_admin_exists(self, session: AsyncSession) -> None:
+    async def ensure_admin_exists(self) -> None:
         """
         Ensures at least one admin exists in the system.
         """
@@ -502,43 +623,43 @@ class UserManager:
             logger.warning("Initial admin credentials not fully provided. Skipping superuser seeding.")
             return
 
-        # Check if ANY admin already exists in the system
-        stmt                    =   select(User).where(User.role == "admin")
-        result                  =   await session.execute(stmt)
-        
-        if result.scalar_one_or_none():
-            logger.info("Admin seed: At least one admin already exists. Skipping superuser seeding.")
+        if not self.session:
             return
 
-        # Seed the superuser
-        hashed                  =   await run_in_threadpool(bcrypt.hashpw, password.encode("utf-8"), bcrypt.gensalt())
-        created_at              =   datetime.now(timezone.utc).isoformat()
+        async with self.session() as session:
+            # Check if ANY admin already exists in the system
+            stmt                    =   select(User).where(User.role == "admin")
+            result                  =   await session.execute(stmt)
+            
+            if result.scalar_one_or_none():
+                logger.info("Admin seed: At least one admin already exists. Skipping superuser seeding.")
+                return
 
-        new_admin               =   User(
-                    username    =   username,
-                    password    =   hashed.decode("utf-8"),
-                    email       =   email,
-                    role        =   "admin",
-                    is_deleted  =   False,
-                    created_at  =   created_at,
-                    last_seen   =   created_at,
-                    city        =   "System",
-                    country     =   "System",
-                    ip          =   "127.0.0.1",
-                    ai_enabled  =   True,
-                )
+            # Seed the superuser
+            hashed                  =   await run_in_threadpool(bcrypt.hashpw, password.encode("utf-8"), bcrypt.gensalt())
+            created_at              =   datetime.now(timezone.utc).isoformat()
 
-        try:
-            session.add(new_admin)
-            await session.flush()  # Try to push to DB early to catch errors here
-            logger.info(f"Successfully seeded superuser: {username}")
-        except Exception as e:
-            # If another worker beat us to it, just log and continue.
-            # No manual rollback here; @transaction handles it if we re-raise, 
-            # but we want to fail gracefully for the admin seed.
-            logger.warning(f"Admin seeding conflict (likely another worker): {type(e).__name__}")
-            # We don't re-raise here because it's a seed operation that shouldn't crash startup
-            # if the admin already exists (due to a race between workers).
+            new_admin               =   User(
+                        username    =   username,
+                        password    =   hashed.decode("utf-8"),
+                        email       =   email,
+                        role        =   "admin",
+                        is_deleted  =   False,
+                        created_at  =   created_at,
+                        last_seen   =   created_at,
+                        city        =   "System",
+                        country     =   "System",
+                        ip          =   "127.0.0.1",
+                        ai_enabled  =   True,
+                    )
+
+            try:
+                session.add(new_admin)
+                await session.commit()
+                logger.info(f"Successfully seeded superuser: {username}")
+            except Exception as e:
+                await session.rollback()
+                logger.warning(f"Admin seeding conflict (likely another worker): {type(e).__name__}")
 
     @transaction
     async def update_last_seen(self, session: AsyncSession, username: str) -> None:
@@ -673,7 +794,7 @@ class UserManager:
                 setattr(user, key, value)
         
         return True
-
+        
     @transaction
     async def update_user_field(self, session: AsyncSession,username: str, field: str, value: Any, current_password: str | None = None) -> bool:
         """
@@ -696,10 +817,14 @@ class UserManager:
         f_lower                     =   field.lower()
         ALLOWED_FIELDS              =   {
             "password", "email", "ai_enabled", "username", "nickname", "max_toasts", "avatar_url", 
-            "bio", "gender", "age", "location", "social_link",
-            "show_age", "show_gender", "show_location", "show_bio", "show_favorites", "is_private"
+            "bio", "gender", "age", "location", "social_link", "full_name", "social_links", "favorite_genres",
+            "show_age", "show_gender", "show_location", "show_bio", "show_favorites", "is_private",
+            "eco_recommendations_enabled", "dm_notifications"
         }
-
+        if user.role == "admin" and field == "username":
+            logger.warning(f"Admin cannot update username for user {username}")
+            raise ValueError("Admin cannot update username. ")
+    
         if f_lower not in ALLOWED_FIELDS:
             logger.warning(f"Unauthorized update attempt on field '{field}' for user {username}")
             raise ValueError(f"Field '{field}' cannot be updated via this endpoint.")
@@ -738,6 +863,11 @@ class UserManager:
             setattr(user, "ai_enabled", bool_value)
             return True
 
+        if f_lower == "eco_recommendations_enabled":
+            bool_value              =   str(value).lower() in ("true", "1", "yes", "t")
+            setattr(user, "eco_recommendations_enabled", bool_value)
+            return True
+
         if f_lower == "max_toasts":
             try:
                 val                 =   int(value)
@@ -763,6 +893,138 @@ class UserManager:
         setattr(user, f_lower, value)
         logger.info(f"DATABASE UPDATE: User '{username}' field '{field}' set to '{value}'")
         return True
+
+
+class AIManager:
+    """
+    Manages persistence for AI chat interactions.
+    """
+
+    def __init__(self):
+        self._session_maker = _session_maker
+
+    @property
+    def session(self):
+        return self._session_maker
+
+    @staticmethod
+    def transaction(func):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            async with self.session() as session:
+                try:
+                    result = await func(self, session, *args, **kwargs)
+                    await session.commit()
+                    return result
+                except Exception as e:
+                    await session.rollback()
+                    logger.error(f"AI TRANSACTION ERROR: {str(e)}")
+                    raise
+        return wrapper
+
+    @transaction
+    async def add_message(self, session: AsyncSession, username: str, role: str, content: str):
+        stmt = select(User).where(User.username == username)
+        res = await session.execute(stmt)
+        user = res.scalar_one_or_none()
+        if not user:
+            return
+        
+        new_msg = AIMessage(user_id=user.id, role=role, content=content)
+        session.add(new_msg)
+
+        # Prune old messages — keep at most 40 per user to bound prompt size and DB growth
+        count_stmt = select(func.count(AIMessage.id)).where(AIMessage.user_id == user.id)
+        count = (await session.execute(count_stmt)).scalar() or 0
+        if count > 40:
+            oldest_stmt = (
+                select(AIMessage.id)
+                .where(AIMessage.user_id == user.id)
+                .order_by(AIMessage.created_at.asc())
+                .limit(count - 40)
+            )
+            oldest_ids = (await session.execute(oldest_stmt)).scalars().all()
+            if oldest_ids:
+                await session.execute(delete(AIMessage).where(AIMessage.id.in_(oldest_ids)))
+
+    @transaction
+    async def get_history(self, session: AsyncSession, username: str, limit: int = 20):
+        stmt = select(User).where(User.username == username)
+        res = await session.execute(stmt)
+        user = res.scalar_one_or_none()
+        if not user:
+            return []
+        
+        msg_stmt = select(AIMessage).where(AIMessage.user_id == user.id).order_by(AIMessage.created_at.asc()).limit(limit)
+        msg_res = await session.execute(msg_stmt)
+        return msg_res.scalars().all()
+    
+    @transaction
+    async def clear_history(self, session: AsyncSession, username: str):
+        stmt = select(User).where(User.username == username)
+        res = await session.execute(stmt)
+        user = res.scalar_one_or_none()
+        if not user:
+            return
+        
+        del_stmt = delete(AIMessage).where(AIMessage.user_id == user.id)
+        await session.execute(del_stmt)
+
+
+
+class NotificationManager:
+    """
+    Manages user notifications (messages, matches, etc.).
+    """
+
+    def __init__(self):
+        self._session_maker = _session_maker
+
+    @property
+    def session(self):
+        return self._session_maker
+
+    @staticmethod
+    def transaction(func):
+        @wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            async with self.session() as session:
+                try:
+                    result = await func(self, session, *args, **kwargs)
+                    await session.commit()
+                    return result
+                except Exception as e:
+                    await session.rollback()
+                    logger.error(f"NOTIFICATION TRANSACTION ERROR: {str(e)}")
+                    raise
+        return wrapper
+
+    @transaction
+    async def create_notification(self, session: AsyncSession, user_id: int, title: str, content: str, type: str = "general"):
+        notif = Notification(user_id=user_id, title=title, content=content, type=type)
+        session.add(notif)
+        return notif
+
+    @transaction
+    async def get_notifications(self, session: AsyncSession, user_id: int, limit: int = 50):
+        stmt = select(Notification).where(Notification.user_id == user_id).order_by(Notification.created_at.desc()).limit(limit)
+        res = await session.execute(stmt)
+        return res.scalars().all()
+
+    @transaction
+    async def mark_as_read(self, session: AsyncSession, user_id: int, notification_id: Optional[int] = None ):
+        if notification_id:
+            stmt = update(Notification).where(Notification.id == notification_id, Notification.user_id == user_id).values(is_read=True)
+        else:
+            stmt = update(Notification).where(Notification.user_id == user_id, Notification.is_read == False).values(is_read=True)
+        await session.execute(stmt)
+        return True
+
+    @transaction
+    async def get_unread_count(self, session: AsyncSession, user_id: int):
+        stmt = select(func.count(Notification.id)).where(Notification.user_id == user_id, Notification.is_read == False)
+        res = await session.execute(stmt)
+        return res.scalar() or 0
 
 
 class MovieManager:
@@ -845,7 +1107,16 @@ class MovieManager:
                 logger.info(f"User {username} hasn't rated/watched enough categories yet.")
                 return []
             
-            ids                 =   [int(i) for i in genre_ids.split(",")]
+            ids                 =   []
+            for i in genre_ids.split(","):
+                try:
+                    ids.append(int(i.strip()))
+                except ValueError:
+                    continue
+            
+            if not ids:
+                return []
+                
             count               =   Counter(ids)
             top_genres          =   [item for item, _ in count.most_common(5)]
             
@@ -878,11 +1149,14 @@ class MovieManager:
             raise UserNotFoundError(username)
 
         # Enforce hard pagination limits
-        limit                   =   min(limit, 100)
+        limit                   =   min(limit, 50)
         skip                    =   max(skip, 0)
 
+        if limit == 50:
+            logger.warning(f"⚠️ Warning: Hard pagination limit of {limit} reached for user {username}")
+            
         # SQL-level pagination — only fetches the requested slice
-        movies_stmt             =   (select(Movies).where(Movies.user_id == user_row).offset(skip).limit(limit))
+        movies_stmt             =   (select(Movies).where(Movies.user_id == user_row).order_by(Movies.id.desc()).offset(skip).limit(limit))
         movies_result           =   await session.execute(movies_stmt)
         movies                  =   movies_result.scalars().all()
         
@@ -896,7 +1170,20 @@ class MovieManager:
         """
         stmt                    =   (select(Movies.tmdb_id).join(User, User.id == Movies.user_id).where(User.username == username))
         result                  =   await session.execute(stmt)
-        return set(result.scalars().all())
+        return set(result.scalars().all())  #type: ignore
+
+    @transaction
+    async def get_favorite_tmdb_ids(self, session: AsyncSession, username: str) -> set[int]:
+        """
+        Return a set of TMDB IDs that are marked as favorites by the user.
+        """
+        stmt = (
+            select(Movies.tmdb_id)
+            .join(User, User.id == Movies.user_id)
+            .where(User.username == username, Movies.is_favorite == True)
+        )
+        result = await session.execute(stmt)
+        return set(result.scalars().all()) # type: ignore
 
     @transaction
     async def delete_movie(self, session: AsyncSession, username: str, movie_id: int) -> bool:
@@ -979,22 +1266,14 @@ class MovieManager:
         return True
         
     @transaction
-    async def add_movie(self, session: AsyncSession, username: str, query: str, tmdb_id: int = 0) -> bool:
+    async def add_movie(self, session: AsyncSession, username: str, movie_data: MovieScheme) -> bool:
         """
-        Search TMDB for a movie and add it to the user's tracked list.
-        Supports either a search query or a direct TMDB ID.
+        Add a movie to the user's tracked list.
+        
+        Supports two flows:
+        1. Legacy (tmdb_id only): Fetches full data from TMDB, generates canonical_id.
+        2. New (canonical_id + sources): Stores the canonical entity directly.
         """
-
-        if tmdb_id:
-            data        =   await fetch_tmdb_movie_by_id(tmdb_id)
-        elif query:
-            data        =   await fetch_tmdb_data(query)
-        else:
-            raise ValueError("Either query or tmdb_id must be provided")
-
-        if not data:
-            raise MovieNotFoundError(query or str(tmdb_id))
-
         stmt            =   select(User).where(User.username == username, User.is_deleted == False)
         result          =   await session.execute(stmt)
         user            =   result.scalar_one_or_none()
@@ -1002,23 +1281,62 @@ class MovieManager:
         if not user:
             raise UserNotFoundError(username)
 
-        is_exist_stmt   =   select(Movies).where(Movies.user_id == user.id, Movies.tmdb_id == data.get("tmdb_id"))
+        # --- Legacy flow: tmdb_id provided, no canonical_id ---
+        if movie_data.tmdb_id and not movie_data.canonical_id:
+            # Check duplicate by tmdb_id
+            dup_stmt    =   select(Movies).where(Movies.user_id == user.id, Movies.tmdb_id == movie_data.tmdb_id)
+            dup_result  =   await session.execute(dup_stmt)
+            if dup_result.scalar_one_or_none():
+                raise MovieAlreadyExists(movie_data.title or str(movie_data.tmdb_id))
+
+            # Fetch full data from TMDB
+            data = await fetch_tmdb_movie_by_id(movie_data.tmdb_id)
+            if not data and movie_data.query:
+                data = await fetch_tmdb_data(movie_data.query)
+            if not data:
+                raise MovieNotFoundError(movie_data.query or str(movie_data.tmdb_id))
+
+            movie       =   Movies(
+                                user_id         =   user.id,
+                                canonical_id    =   str(uuid.uuid4()),
+                                tmdb_id         =   data.get("tmdb_id"),
+                                title           =   data.get("title", "Unknown"),
+                                type            =   "movie",
+                                sources         =   {"tmdb": {"id": str(data.get("tmdb_id")), "provider_name": "tmdb"}},
+                                overview        =   data.get("overview", ""),
+                                genre_ids       =   data.get("genre_ids", ""),
+                                status          =   "Not yet",
+                                vote_average    =   data.get("vote_average"),
+                                poster_url      =   data.get("poster_url"),
+                                release_date    =   data.get("release_date"),
+                                ai_reason       =   movie_data.ai_reason or data.get("ai_reason", "")
+                            )
+            session.add(movie)
+            return True
+
+        # --- New flow: canonical_id provided ---
+        canonical_id = movie_data.canonical_id or str(uuid.uuid4())
+
+        # Check duplicate by canonical_id
+        is_exist_stmt   =   select(Movies).where(Movies.user_id == user.id, Movies.canonical_id == canonical_id)
         is_exist_result =   await session.execute(is_exist_stmt)
-        is_exist        =   is_exist_result.scalar_one_or_none()
-        
-        if is_exist:
-            raise MovieAlreadyExists(data.get("title"))  # type:ignore
+        if is_exist_result.scalar_one_or_none():
+            raise MovieAlreadyExists(movie_data.title or "Unknown")
         
         movie       =   Movies(
                             user_id         =   user.id,
-                            tmdb_id         =   data.get("tmdb_id"),
-                            title           =   data.get("title"),
-                            overview        =   data.get("overview"),
-                            genre_ids       =   data.get("genre_ids"),
+                            canonical_id    =   canonical_id,
+                            tmdb_id         =   movie_data.tmdb_id,
+                            title           =   movie_data.title or "Unknown",
+                            type            =   movie_data.type or "movie",
+                            sources         =   movie_data.sources,
+                            overview        =   movie_data.overview or "",
+                            genre_ids       =   movie_data.genre_ids or "",
                             status          =   "Not yet",
-                            vote_average    =   data.get("vote_average"),
-                            poster_url      =   data.get("poster_url"),
-                            release_date    =   data.get("release_date"),
+                            vote_average    =   str(movie_data.vote_average) if movie_data.vote_average is not None else None,
+                            poster_url      =   movie_data.poster_url,
+                            release_date    =   movie_data.release_date,
+                            ai_reason       =   movie_data.ai_reason or "",
                         )
 
         session.add(movie)
@@ -1057,6 +1375,35 @@ class MovieManager:
             is_fav = False
             
         return {"success": True, "is_favorite": is_fav}
+        
+    @transaction
+    async def get_favorites(self, session: AsyncSession, username: str) -> List[dict]:
+        """Fetch all favorite movies for a user."""
+        user_stmt = select(User).where(User.username == username, User.is_deleted == False)
+        user_result = await session.execute(user_stmt)
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise UserNotFoundError(username)
+
+        stmt = select(Movies).where(Movies.user_id == user.id, Movies.is_favorite == True).order_by(Movies.id.desc())
+        result = await session.execute(stmt)
+        movies = result.scalars().all()
+        return [{c.name: getattr(m, c.name) for c in m.__table__.columns} for m in movies]
+
+    @transaction
+    async def sort_by_release_date(self, session: AsyncSession, username: str) -> List[dict]:
+        """Fetch all rated movies for a user within the given rating range."""
+        user_stmt = select(User).where(User.username == username, User.is_deleted == False)
+        user_result = await session.execute(user_stmt)
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise UserNotFoundError(username)
+
+        stmt = select(Movies).where(Movies.user_id == user.id).order_by(Movies.release_date.desc())
+        result = await session.execute(stmt)
+        movies = result.scalars().all()
+        return [{c.name: getattr(m, c.name) for c in m.__table__.columns} for m in movies]
+
 
 class SocialManager:
     """
@@ -1172,6 +1519,15 @@ class SocialManager:
         )
         session.add(msg)
         await session.flush()
+
+        # Trigger notification only if receiver has DM notifications enabled
+        receiver_pref_stmt = select(User.dm_notifications).where(User.id == receiver_id)
+        receiver_pref_res = await session.execute(receiver_pref_stmt)
+        dm_enabled = receiver_pref_res.scalar()
+
+        if dm_enabled is not False:  # Default to True if column is None
+            from services.deps import notification_manager
+            await notification_manager.create_notification(user_id=receiver_id,title="New Message",content=f"You received a message: {content[:30]}...",type="message") #type: ignore   
         return msg
 
     @transaction
@@ -1194,13 +1550,20 @@ class SocialManager:
     @transaction
     async def delete_message(self, session: AsyncSession, message_id: int, user_id: int):
         """
-        Hard delete a message if the user is the sender.
+        Hard delete a message — only the sender may delete their own messages.
+        SELECT first to verify ownership before issuing the DELETE.
+        A DELETE statement returns a CursorResult, not a scalar — checking
+        scalar_one_or_none() on a DELETE always returns None, making any
+        post-delete ownership check impossible. We must SELECT then DELETE.
         """
-        stmt = delete(Message).where(Message.id == message_id, Message.sender_id == user_id)
-        result = await session.execute(stmt)
-        deleted = result.scalar_one_or_none()
-        if deleted is None:
+        stmt    = select(Message).where(Message.id == message_id, Message.sender_id == user_id)
+        res     = await session.execute(stmt)
+        msg     = res.scalar_one_or_none()
+        
+        if not msg:
             raise ValueError("Message not found or you are not the sender")
+
+        await session.delete(msg)
 
     @transaction
     async def handle_request(self, session: AsyncSession, user_id: int, other_id: int, action: str):
@@ -1235,22 +1598,21 @@ class SocialManager:
         return True
 
     @transaction
-    async def get_messages(self, session: AsyncSession, user_a: int, user_b: int) -> List[dict]:
+    async def get_messages(self, session: AsyncSession, user_a: int, user_b: int, skip: int = 0, limit: int = 50) -> List[dict]:
         """
-        Fetch full message history between two users, excluding deleted ones.
-        Filters from user_a's perspective: hide messages user_a deleted as sender or receiver.
+        Get the full chat history between two users, ordered chronologically.
         """
         stmt = select(Message).where(
             or_(
-                # Messages I sent to them — hide if I deleted them
                 and_(Message.sender_id == user_a, Message.receiver_id == user_b, Message.deleted_by_sender == False),
-                # Messages they sent to me — hide if I deleted them
                 and_(Message.sender_id == user_b, Message.receiver_id == user_a, Message.deleted_by_receiver == False)
             )
-        ).order_by(Message.created_at.asc())
+        ).order_by(Message.created_at.desc()).offset(skip).limit(limit)
         
         result = await session.execute(stmt)
         messages = result.scalars().all()
+        # Reverse to chronological order after desc fetch
+        messages = messages[::-1]
         
         return [
             {
@@ -1269,7 +1631,7 @@ class SocialManager:
         ]
 
     @transaction
-    async def get_conversations(self, session: AsyncSession, user_id: int, status: str = "ACCEPTED") -> List[dict]:
+    async def get_conversations(self, session: AsyncSession, user_id: int, status: str = "ACCEPTED", skip: int = 0, limit: int = 50) -> List[dict]:
         """
         Get all conversations for a user with specific status.
         ACCEPTED: Normal inbox (includes sender's PENDING conversations as PENDING_SENT).
@@ -1290,7 +1652,7 @@ class SocialManager:
         
         from sqlalchemy.orm import joinedload
         # Fix 5.4: Use joinedload for user1/user2 to avoid N+1
-        stmt = stmt.options(joinedload(Conversation.user1), joinedload(Conversation.user2))
+        stmt = stmt.options(joinedload(Conversation.user1), joinedload(Conversation.user2)).offset(skip).limit(limit)
         res = await session.execute(stmt)
         convs = res.scalars().all()
         
@@ -1431,11 +1793,22 @@ class SocialManager:
             return True
         return False
 
+    _similarity_cooldown: dict = {}  # user_id -> last_run_timestamp
+
     async def recalculate_user_similarity(self, user_id: int):
         """
         Heavy operation: Re-calculates similarity between this user and all others.
-        In a production environment, this should be a background task (Celery/RQ).
+        Throttled to run at most once every 5 minutes per user to avoid
+        blocking the event loop on every /social/similar request.
         """
+        import time as _time
+        now = _time.time()
+        last = self._similarity_cooldown.get(user_id, 0)
+        if now - last < 300:  # 5-minute cooldown per user
+            logger.info(f"Similarity recalc skipped for user {user_id} (cooldown)")
+            return
+        self._similarity_cooldown[user_id] = now
+
         if self.session:
             async with self.session() as session:
                 # 1. Get current user's movies/genres
@@ -1506,7 +1879,6 @@ class SocialManager:
                         else:
                             match.score = total_score
                             match.reasons = ", ".join(reasons)
-                            match.updated_at = datetime.now(timezone.utc).isoformat()
 
                 await session.commit()
 
@@ -1523,6 +1895,7 @@ class SocialManager:
         # Get favorites
         fav_stmt = select(Movies).where(Movies.user_id == user.id, Movies.is_favorite == True).limit(3)
         fav_res = await session.execute(fav_stmt)
+        
         favorites = [{
             "id":           m.id,
             "tmdb_id":      m.tmdb_id,
@@ -1539,9 +1912,16 @@ class SocialManager:
         
         top_genres = []
         if genre_ids:
-            ids         = [int(i) for i in genre_ids.split(",")]
-            count       = Counter(ids)
-            top_genres  = [item for item, _ in count.most_common(3)]
+            ids = []
+            for i in genre_ids.split(","):
+                try:
+                    ids.append(int(i.strip()))
+                except ValueError:
+                    continue
+            
+            if ids:
+                count           = Counter(ids)
+                top_genres      = [item for item, _ in count.most_common(3)]
 
         return {
             "id":           user.id,

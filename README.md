@@ -1,10 +1,10 @@
-# CineWave
+# ecofil
 
 <p align="center">
-  <img src="./.images/hero.png" alt="CineWave Hero" width="100%" />
+  <img src="./.images/hero.png" alt="ecofil Hero" width="100%" />
 </p>
 
-CineWave is a movie tracking and recommendation system built with FastAPI and Next.js. It features a personalized AI assistant that provides movie suggestions based on your library and preferences.
+ecofil is a movie tracking and recommendation system built with FastAPI and Next.js. It features a personalized AI assistant that provides movie suggestions based on your library and preferences.
 
 ## Features
 
@@ -45,7 +45,7 @@ cp .env.example .env
 Start the PostgreSQL database container:
 
 ```bash
-docker-compose up -d cinewave_db
+docker-compose up -d ecofil_db
 ```
 
 ### 3. Backend & Migrations
@@ -73,7 +73,7 @@ The API is available at `http://localhost:8000` and the frontend at `http://loca
 
 ## Production Deployment
 
-CineWave uses a multi-stage Docker build to package both the backend and the frontend into a single container.
+ecofil uses a multi-stage Docker build to package both the backend and the frontend into a single container.
 
 ```bash
 # Build and start production containers

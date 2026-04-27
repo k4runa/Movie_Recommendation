@@ -58,13 +58,12 @@ async def login(response: Response, request: Request, form_data: OAuth2PasswordR
 
     access_token            =   create_access_token(data={"sub": user_in_db["username"]})
     
-    # Fix 8.1: Set httpOnly cookie
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
         secure=True, # Should be True in production (HTTPS)
-        samesite="lax",
+        samesite="strict",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     
@@ -105,7 +104,7 @@ async def google_login(response: Response, request: Request, body: GoogleLoginRe
         user_agent=request.headers.get("user-agent", "Unknown")
     ) #type: ignore
     access_token = create_access_token(data={"sub": user_in_db["username"]})
-    # Fix 8.1: Set httpOnly cookie
+
     response.set_cookie(key="access_token",value=access_token,httponly=True,secure=True,samesite="lax",max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60)
     logger.info(f"GOOGLE LOGIN SUCCESS: User '{user_in_db['username']}' authenticated")
     return {
@@ -138,6 +137,5 @@ async def logout(response: Response, token: str = Depends(get_token_from_cookie_
         # If token is invalid or expired, it's essentially already logged out
         pass
 
-    # Fix 8.1: Clear cookie
     response.delete_cookie(key="access_token", httponly=True, samesite="lax")
     return {"success": True, "message": "Successfully logged out"}

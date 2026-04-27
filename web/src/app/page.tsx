@@ -62,7 +62,7 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-pulse text-2xl font-black tracking-widest text-primary">
-          CINEWAVE...
+          ecofil...
         </div>
       </div>
     );
@@ -73,7 +73,7 @@ export default function Home() {
       <div className="flex flex-col items-center justify-center min-h-screen space-y-8 p-6 animate-in fade-in zoom-in duration-500">
         <div className="text-center space-y-2">
           <h1 className="text-7xl font-black tracking-tighter text-foreground drop-shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-            CINEWAVE
+            ecofil
           </h1>
           <p className="text-muted-foreground font-medium tracking-wide">
             Your AI Cinematic Expert
@@ -221,7 +221,7 @@ export default function Home() {
                           Preferences
                         </h3>
                         <p className="text-muted-foreground font-medium">
-                          Customize your CineWave experience.
+                          Customize your ecofil experience.
                         </p>
                       </div>
                       <SettingsDashboard />
