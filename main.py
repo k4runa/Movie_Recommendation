@@ -46,16 +46,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 async def lifespan(app: FastAPI):
     """
     Handles startup and shutdown events.
-    At startup, creates database tables and ensures that at least one
-    admin account is seeded.
+    Seeds the admin account and starts background tasks.
+    Table creation is handled exclusively by Alembic migrations.
     """    
-    logger.info("Application startup: Ensuring tables exist and seeding admin...")
-    # Auto-create tables on startup
-    if db_mod._engine:
-        async with db_mod._engine.begin() as conn:
-            await conn.run_sync(db_mod.Base.metadata.create_all)
-            # FORCE FIX: Check if social_link exists, if not add it (moved to alembic)
-            
+    logger.info("Application startup: seeding admin, starting background tasks...")
     await users_manager.ensure_admin_exists()  # type: ignore
     # Start background cache cleaner
     cache_task = asyncio.create_task(cache_service.clear_expired())
@@ -111,9 +105,8 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    logger.error("DATABASE_URL not found in environment!")
-else:
-    init_database(DATABASE_URL)
+    raise RuntimeError("DATABASE_URL environment variable is required but not set.")
+init_database(DATABASE_URL)
 
 # Parse allowed origins from environment
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000")

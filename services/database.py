@@ -70,6 +70,20 @@ os.environ["DATABASE_URL_SYNC"] = db_url_sync
  
 SENSITIVE_FIELDS = {"password", "ip", "hostname", "device_name", "machine", "memory", "device", "os"}
 
+# Fields returned by get_user_for_auth — the minimum needed for login and token validation.
+AUTH_FIELDS = {"id", "username", "password", "role", "is_deleted", "avatar_url", "email"}
+
+# Fields that update_profile is allowed to write. Anything outside this set is rejected.
+PROFILE_ALLOWLIST = {
+    "full_name", "nickname", "bio", "gender", "age", "location",
+    "social_links", "favorite_genres", "social_link",
+}
+
+
+def _to_safe_dict(user, exclude: set[str] = SENSITIVE_FIELDS) -> dict:
+    """Convert an ORM User instance to a dict, stripping fields in `exclude`."""
+    return {c.name: getattr(user, c.name) for c in user.__table__.columns if c.name not in exclude}
+
 # ---------------------------------------------------------------------------
 # Logging Configuration
 # ---------------------------------------------------------------------------
@@ -522,6 +536,22 @@ class UserManager:
 
     # --- Queries ---
 
+    async def get_user_for_auth(self, username: str) -> dict | None:
+        """
+        Internal method for authentication only.
+        Returns the minimum fields needed for login and token validation,
+        including the password hash. Never expose this result via API responses.
+        """
+        if not self.session:
+            return None
+        async with self.session() as session:
+            stmt = select(User).where(User.username == username, User.is_deleted == False)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+            if not user:
+                return None
+            return {c.name: getattr(user, c.name) for c in user.__table__.columns if c.name in AUTH_FIELDS}
+
     async def user_exists(self, username: str) -> bool:
         """Check whether a user with the given username exists (non-deleted)."""
         if self.session:
@@ -676,6 +706,7 @@ class UserManager:
     async def get_user_by_username(self, session: AsyncSession, username: str) -> dict:
         """
         Retrieve a single user record by username.
+        Sensitive fields (password, ip, device info) are stripped.
 
         Returns:
             dict mapping column names to their values.
@@ -688,16 +719,16 @@ class UserManager:
         user    = result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(username)
-        return {c.name: getattr(user, c.name) for c in user.__table__.columns}
+        return _to_safe_dict(user)
 
     @transaction
     async def get_user_by_email(self, session: AsyncSession, email: str) -> dict | None:
-        """Fetch a user record by email address."""
+        """Fetch a user record by email address. Sensitive fields are stripped."""
         stmt    = select(User).where(User.email == email, User.is_deleted == False)
         result  = await session.execute(stmt)
         user    = result.scalar_one_or_none()
         if user:
-            return {c.name: getattr(user, c.name) for c in user.__table__.columns}
+            return _to_safe_dict(user)
         return None
 
     @transaction
@@ -709,7 +740,7 @@ class UserManager:
         
         if user:
             user.last_seen  =   datetime.now(timezone.utc).isoformat()
-            return {c.name: getattr(user, c.name) for c in user.__table__.columns}
+            return _to_safe_dict(user)
         # Create new user
         base_username   =   email.split("@")[0].replace(".", "_")
         username        =   base_username
@@ -747,7 +778,7 @@ class UserManager:
         session.add(new_user)
         await session.flush()
         
-        return {c.name: getattr(new_user, c.name) for c in new_user.__table__.columns}
+        return _to_safe_dict(new_user)
 
     @transaction
     async def get_user_by_id(self, session: AsyncSession, id: int) -> dict:
@@ -759,7 +790,7 @@ class UserManager:
         user            =   result.scalar_one_or_none()
         if not user:
             raise UserNotFoundError(str(id))
-        return {c.name: getattr(user, c.name) for c in user.__table__.columns if c.name not in SENSITIVE_FIELDS}
+        return _to_safe_dict(user)
 
     @transaction
     async def get_all_users(self, session: AsyncSession, skip: int = 0, limit: int = 10) -> list[dict]:
@@ -772,15 +803,17 @@ class UserManager:
         """
         limit = min(limit, 100)  # Hard maximum to prevent unbounded queries
         skip = max(skip, 0)
-        stmt            =   select(User).offset(skip).limit(limit)
+        stmt            =   select(User).where(User.is_deleted == False).offset(skip).limit(limit)
         result          =   await session.execute(stmt)
         users           =   result.scalars().all()
-        return [{c.name: getattr(u, c.name) for c in u.__table__.columns if c.name not in SENSITIVE_FIELDS} for u in users]
+        return [_to_safe_dict(u) for u in users]
 
     @transaction
     async def update_profile(self, session: AsyncSession, username: str, data: dict) -> bool:
         """
         Update multiple profile fields at once.
+        Only fields in PROFILE_ALLOWLIST can be written. Any other key is silently ignored
+        to prevent mass assignment of role, password, or other privileged columns.
         """
         stmt = select(User).where(User.username == username, User.is_deleted == False)
         result = await session.execute(stmt)
@@ -790,7 +823,7 @@ class UserManager:
             return False
 
         for key, value in data.items():
-            if hasattr(user, key) and value is not None:
+            if key in PROFILE_ALLOWLIST and hasattr(user, key) and value is not None:
                 setattr(user, key, value)
         
         return True

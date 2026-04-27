@@ -183,14 +183,32 @@ class AIService:
         raise Exception("All Groq API keys exhausted.")
 
     def _sanitize_context(self, text: str) -> str:
-        """Fix 2.3/6.3: Basic sanitization to prevent prompt injection."""
-        if not text: return ""
-        # Remove common injection markers and backticks
-        forbidden = ["<system>", "</system>", "<|im_start|>", "<|im_end|>", "IGNORE ALL PREVIOUS", "DAN:"]
-        sanitized = text.replace("`", "'")
-        for word in forbidden:
-            sanitized = sanitized.replace(word, "[REDACTED]")
-        return sanitized[:1000] # Limit context length
+        """
+        Strip known prompt injection patterns from user-supplied text before
+        embedding it in an AI prompt.  This is defense-in-depth — the prompt
+        structure itself also uses delimiters that instruct the model to ignore
+        instructions inside user data blocks.
+        """
+        if not text:
+            return ""
+        import re
+        # Strip all XML/HTML-style tags (covers <system>, <|im_start|>, etc.)
+        sanitized = re.sub(r"<[^>]{1,50}>", "", text)
+        # Strip common role-override attempts (case-insensitive)
+        injection_patterns = [
+            r"(?i)ignore\s+(all\s+)?previous\s+instructions?",
+            r"(?i)you\s+are\s+now\s+",
+            r"(?i)act\s+as\s+(a\s+)?",
+            r"(?i)system\s*:",
+            r"(?i)assistant\s*:",
+            r"(?i)DAN\s*:",
+            r"(?i)jailbreak",
+        ]
+        for pattern in injection_patterns:
+            sanitized = re.sub(pattern, "", sanitized)
+        # Replace backticks to prevent markdown code-block escapes
+        sanitized = sanitized.replace("`", "'")
+        return sanitized[:500]
 
     async def generate_ai_recommendations(self, watched_movies: list[dict[str, Any]]) -> list[str]:
         """Generates a list of 10 movie titles recommended by Eco based on history."""

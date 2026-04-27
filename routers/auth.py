@@ -44,8 +44,8 @@ async def login(response: Response, request: Request, form_data: OAuth2PasswordR
     """
     user_in_db              =   None
     try:
-        user_in_db          =   await users_manager.get_user_by_username(form_data.username)  # type: ignore
-    except UserNotFoundError:
+        user_in_db          =   await users_manager.get_user_for_auth(form_data.username)  # type: ignore
+    except Exception:
         pass
 
     # Normalize response time to prevent User Enumeration via Timing Attacks

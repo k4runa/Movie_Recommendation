@@ -244,17 +244,17 @@ async def get_current_user(token: str = Depends(get_token_from_cookie_or_header)
         payload                     =   jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"require": ["exp"]})
         username:str                =   payload.get("sub")  # type: ignore
         if username:
-            try:
-                user_in_db = await users_manager.get_user_by_username(username) #type: ignore
-                if user_in_db.get("is_deleted"):
-                    logger.warning(f"Attempted access by deleted user: {username}")
-                    raise credentials_exception
-                
-                # Update last_seen asynchronously
-                await users_manager.update_last_seen(username)  #type: ignore
-            except UserNotFoundError:
+            user_in_db = await users_manager.get_user_for_auth(username) #type: ignore
+            if not user_in_db:
                 logger.warning(f"Attempted access by non-existent user: {username}")
                 raise credentials_exception
+
+            if user_in_db.get("is_deleted"):
+                logger.warning(f"Attempted access by deleted user: {username}")
+                raise credentials_exception
+            
+            # Update last_seen asynchronously
+            await users_manager.update_last_seen(username)  #type: ignore
 
             token_data = {
                 "username": username,
